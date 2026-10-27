@@ -1,5 +1,7 @@
-# Rebuilds meta.json every day. Smogon posts new usage stats once a month, so most runs find nothing new
-# and commit nothing. Can also be run by hand from the Actions tab ("Run workflow").
+# Rebuilds meta.json (usage stats) and bbr.json (every Pokemon's BBR) every day. Smogon posts new usage stats once a
+# month and Showdown's data changes now and then, so most runs find nothing new and commit nothing. bbr.json is only
+# recomputed when Showdown's data (or the BBR model) changed, since its battle simulation takes a while.
+# Can also be run by hand from the Actions tab ("Run workflow").
 name: Update usage stats
 
 on:
@@ -13,21 +15,31 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
       - name: Build meta.json
         run: python3 build_meta.py
+      - name: Build bbr.json
+        run: |
+          pip install numpy
+          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/smogon/pokemon-showdown.git ps
+          git -C ps sparse-checkout set --no-cone '/data/*.ts'
+          node bbr/export_showdown.mjs ps/data gen9.json
+          python3 build_bbr.py --data gen9.json --source "$(git -C ps log -1 --format=%H)"
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet meta.json; then
-            git add meta.json
-            git commit -m "Usage stats for $(python3 -c 'import json; print(json.load(open("meta.json"))["month"])')"
+          if ! git diff --quiet meta.json bbr.json; then
+            git add meta.json bbr.json
+            git commit -m "Usage stats for $(python3 -c 'import json; print(json.load(open("meta.json"))["month"])'), BBR built $(python3 -c 'import json; print(json.load(open("bbr.json"))["built"])')"
             git push
           # GitHub pauses scheduled jobs after 60 days without commits, so leave a small one every 50 days.
           elif [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -gt $(( 50 * 86400 )) ]; then
