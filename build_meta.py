@@ -10,7 +10,7 @@ anyone editing this file. Smogon posts once a month, so most days nothing change
 Sources: https://www.smogon.com/stats/ (official Smogon usage stats)
          https://play.pokemonshowdown.com/data/pokedex.json (tiers; Pokemon Showdown, MIT license)
 """
-import json, re, sys, urllib.request
+import json, re, sys, time, urllib.error, urllib.request
 
 STATS = "https://www.smogon.com/stats"
 TOP = 50           # Pokemon kept per format
@@ -18,11 +18,18 @@ DOUBLES_PICKS = 2  # most-played VGC/Champions formats to include
 SCHEMA = 1         # bump if the app needs a new field layout
 
 
-def fetch(url, as_json=True):
+def fetch(url, as_json=True, tries=4):
+    """Downloads a URL, retrying a few times since Smogon's server sometimes answers with a temporary error (5xx)."""
     request = urllib.request.Request(url, headers={"User-Agent": "PokeBattleBuddy-data-builder"})
-    with urllib.request.urlopen(request, timeout=120) as response:
-        body = response.read()
-    return json.loads(body) if as_json else body.decode()
+    for attempt in range(tries):
+        try:
+            with urllib.request.urlopen(request, timeout=120) as response:
+                body = response.read()
+            return json.loads(body) if as_json else body.decode()
+        except (urllib.error.URLError, TimeoutError) as error:
+            if attempt == tries - 1 or (isinstance(error, urllib.error.HTTPError) and error.code < 500):
+                raise
+            time.sleep(10 * (attempt + 1))
 
 
 def newest_month():
