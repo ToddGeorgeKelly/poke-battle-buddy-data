@@ -8,6 +8,7 @@ import numpy as np
 
 ORD = {"AG": 8, "Uber": 7, "OU": 6, "UUBL": 5.5, "UU": 5, "RUBL": 4.5, "RU": 4, "NUBL": 3.5, "NU": 3,
        "PUBL": 2.5, "PU": 2, "ZUBL": 1.5, "ZU": 1}
+TIER_ALIAS = {"(OU)": "OU"}  # Showdown's tag for low-usage Pokemon that are still OU
 TYPES = ["Normal", "Fire", "Water", "Electric", "Grass", "Ice", "Fighting", "Poison", "Ground", "Flying",
          "Psychic", "Bug", "Rock", "Ghost", "Dragon", "Dark", "Steel", "Fairy"]
 TI = {t: i for i, t in enumerate(TYPES)}
@@ -23,13 +24,20 @@ _cache = {}
 
 def gendata(g):
     if g not in _cache:
-        _cache[g] = json.load(open(f"/tmp/bbr/gen/gen{g}.json"))
+        with open(f"/tmp/bbr/gen/gen{g}.json") as fh:
+            _cache[g] = json.load(fh)
     return _cache[g]
 
 
+def set_gendata(g, data):
+    """Production: use this data (one Showdown export) for generation g."""
+    _cache[g] = data
+
+
 def load_gendata(g, path):
-    """Use this file for generation g's data (the research reads /tmp/bbr/gen by default)."""
-    _cache[g] = json.load(open(path))
+    """Production: use this file for generation g's data (the research reads /tmp/bbr/gen by default)."""
+    with open(path) as fh:
+        set_gendata(g, json.load(fh))
 
 
 def type_matrix(g):
@@ -46,7 +54,13 @@ def type_matrix(g):
 
 def learnable(g, mon_id, dex, ls, natdex=False):
     """Moves a Pokemon can have in gen g (own + prevo chain + base species), as a set of move IDs.
-    natdex: any move it could learn in any generation up to g (National Dex rules)."""
+
+    natdex (production, for Pokemon not in gen g): also keep moves that no longer exist in gen g (National Dex).
+
+    Like Showdown, a move learned in any gen up to g counts (transfer forward, incl. Virtual Console "7V"
+    and Let's Go "8V" sources), except moves that no longer exist in gen g (`isNonstandard`, e.g. Pursuit
+    and Hidden Power in Gens 8-9)."""
+    gone = set() if natdex else {m for m, x in gendata(g)["moves"].items() if x.get("isNonstandard")}
     out = set()
     seen = set()
     cur = mon_id
@@ -55,7 +69,7 @@ def learnable(g, mon_id, dex, ls, natdex=False):
             sg = int(s[0])
         except ValueError:
             return False
-        return sg == g if g >= 8 and not natdex else sg <= g
+        return sg <= g
     stack = [mon_id]
     while stack:
         cur = stack.pop()
@@ -65,7 +79,7 @@ def learnable(g, mon_id, dex, ls, natdex=False):
         entry = ls.get(cur, {}).get("learnset")
         if entry:
             for mv, srcs in entry.items():
-                if any(src_ok(s) for s in srcs):
+                if mv not in gone and any(src_ok(s) for s in srcs):
                     out.add(mv)
         p = dex[cur]
         if p.get("prevo"):
@@ -78,25 +92,72 @@ def learnable(g, mon_id, dex, ls, natdex=False):
     return out
 
 
+# Species whose alternate forms are cosmetic or a type swap of the base (one row, like Arceus):
+# Pikachu caps / Cosplay / Partner, Silvally memories.
+BASE_FORM_ONLY = {"Pikachu", "Silvally"}
+EVENT_ONLY = {"pichuspikyeared"}
+
+
+def not_a_teambuilder_pick(p):
+    """Forms that carry a tier in Showdown's data but aren't a separate Pokemon you build a team with."""
+    forme = p.get("forme", "")
+    if forme.endswith("Gmax") or forme.endswith("Totem") or sid(p["name"]) in EVENT_ONLY:
+        return True
+    if forme and p.get("baseSpecies") in BASE_FORM_ONLY:
+        return True
+    if p.get("battleOnly"):
+        # Mid-battle transformations (Zen Mode, Blade Forme, Ash-Greninja, Ultra Burst...) belong to the
+        # out-of-battle form. Keep the ones a held item locks in from turn 1, like Megas and Primals
+        # (Zacian/Zamazenta-Crowned); a Z-Crystal (Ultranecrozium Z) only triggers a mid-battle change.
+        item = p.get("requiredItem") or ""
+        return not item or item.endswith(" Z")
+    return False
+
+
+def usable_abilities(g, p):
+    """Ability IDs a Pokemon can actually have in gen g: no Hidden Abilities before Gen 5, and none that
+    Showdown flags `unreleasedHidden` for that gen (e.g. Gen 5 Serperior's Contrary)."""
+    if g < 3:
+        return []
+    hidden_ok = g >= 5 and not p.get("unreleasedHidden")
+    return [sid(a) for slot, a in p["abilities"].items() if slot != "H" or hidden_ok]
+
+
+# Smeargle learns everything through Sketch, which a learnset can't express. Use the moves of its standard
+# competitive sets instead (Smogon analyses, Gens 4-9: Spore lead with entry hazards / Sticky Web, Rapid Spin,
+# Whirlwind, Taunt); moves that don't exist in a gen are dropped.
+GEN_LAST_MOVE = {4: 467, 5: 559}  # highest move number introduced by that gen (the gen 4-5 data lists later moves)
+SKETCH_SET = {"spore", "stickyweb", "stealthrock", "spikes", "rapidspin", "whirlwind", "taunt"}
+
+
 def roster(g):
     """Every Pokemon with a real singles tier in gen g."""
     d = gendata(g)
     dex, fmt, ls = d["pokedex"], d["formats"], d["learnsets"]
-    mons = []
+    mons, seen = [], set()
     for k, f in fmt.items():
-        t = f.get("tier")
+        t = TIER_ALIAS.get(f.get("tier"), f.get("tier"))
         if t not in ORD or k not in dex:
             continue
         p = dex[k]
-        if p.get("num", 0) <= 0:
+        if p.get("num", 0) <= 0 or not_a_teambuilder_pick(p):
             continue
         s = p["baseStats"]
         stats = [s["hp"], s["atk"], s["def"], s["spa"], s["spd"], s["spe"]]
-        abil = [sid(a) for a in p["abilities"].values()] if g >= 3 else []
+        abil = usable_abilities(g, p)
         evos = [e for e in p.get("evos", []) if sid(e) in fmt and fmt[sid(e)].get("tier") not in (None, "Illegal")]
+        moves = learnable(g, k, dex, ls)
+        if k == "smeargle":
+            moves = {m for m in SKETCH_SET if m in d["moves"] and not d["moves"][m].get("isNonstandard")
+                     and d["moves"][m].get("num", 0) <= GEN_LAST_MOVE.get(g, 10 ** 6)}
+        # Forms identical in battle (Genesect drives, Keldeo-Resolute) count once; the base comes first.
+        key = (tuple(stats), tuple(p["types"]), tuple(sorted(abil)), frozenset(moves))
+        if key in seen:
+            continue
+        seen.add(key)
         mons.append(dict(id=k, name=p["name"], gen=g, tier=t, y=ORD[t], stats=stats, types=p["types"],
                          abil=abil, nfe=bool(evos), weight=p.get("weightkg", 50),
-                         moves=learnable(g, k, dex, ls)))
+                         moves=moves))
     return mons
 
 
@@ -188,9 +249,10 @@ def move_options(g, mon, ability):
             power *= 0.8 if ability != "contrary" else 1.2
         elif drop == -1:
             power *= 0.9
-        rec = x.get("recoil")
-        if rec and ability not in ("rockhead", "magicguard"):
-            power *= 1 - rec[0] / rec[1] / 3
+        rec = x.get("recoil")  # the user loses this share of the damage it deals (the sim charges it)
+        recoil = rec[0] / rec[1] if rec and ability not in ("rockhead", "magicguard") else 0.0
+        dr = x.get("drain")  # ... or heals this share
+        drain = dr[0] / dr[1] if dr else 0.0
         if x.get("mindBlownRecoil"):
             continue
         # attacker ability modifiers on power
@@ -225,8 +287,20 @@ def move_options(g, mon, ability):
             prio = 3
         if m in ("suckerpunch", "thunderclap"):
             power *= 0.9  # fails if the foe doesn't attack
+        # which stats the damage uses: Psyshock-likes hit Defense, Body Press attacks with Defense,
+        # Foul Play with the target's Attack; Freeze-Dry is super effective on Water
+        kind = "phys" if cat == "Physical" else "spec"
+        if x.get("overrideDefensiveStat") == "def":
+            kind = "psyshock"
+        elif x.get("overrideOffensiveStat") == "def":
+            kind = "bodypress"
+        elif x.get("overrideOffensivePokemon") == "target":
+            kind = "foulplay"
+        elif m == "freezedry":
+            kind = "freezedry"
         out.append(dict(type=typ, cat=cat, contact=bool(flags.get("contact")), prio=prio, power=power,
-                        fixed=fixed, acc=acc, sound=bool(flags.get("sound")), id=m))
+                        fixed=fixed, acc=acc, sound=bool(flags.get("sound")), id=m, kind=kind,
+                        recoil=recoil, drain=drain))
     return out
 
 
@@ -234,7 +308,7 @@ STATUS_MOVES = {  # move -> (status, accuracy)
     "willowisp": ("brn", .85), "toxic": ("tox", .90), "thunderwave": ("par", .90), "glare": ("par", 1.0),
     "stunspore": ("par", .75), "spore": ("slp", 1.0), "sleeppowder": ("slp", .75), "hypnosis": ("slp", .6),
     "darkvoid": ("slp", .8), "lovelykiss": ("slp", .75), "sing": ("slp", .55), "grasswhistle": ("slp", .55),
-    "yawn": ("slp", 1.0), "poisonpowder": ("psn", .75), "toxicthread": ("psn", 1.0),
+    "yawn": ("slp", 1.0), "poisonpowder": ("psn", .75), "toxicthread": ("psn", 1.0), "poisongas": ("psn", .9),
 }
 RECOVERY = {"recover", "softboiled", "roost", "slackoff", "milkdrink", "shoreup", "healorder", "moonlight",
             "morningsun", "synthesis", "strengthsap", "lunarblessing", "junglehealing", "rest_", "wish_"}

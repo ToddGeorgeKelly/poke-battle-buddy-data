@@ -2,7 +2,13 @@
 
 BBR is one number for how good a Pokemon is in singles battles, on BSR's scale (average 420, standard deviation 120).
 It adds up 11 parts, each weighted by how well it predicted Smogon's tiers in Generations 4-9 (fitted on five
-generations and checked on the sixth). The research behind it is in the app's "BBR Research" folder.
+generations and checked on the sixth). The research behind it is in the app's "BBR Research" folder
+(BBR_RESEARCH.md, part 3); bbr/bbrlib.py and bbr/duel.py are copies of the research's, plus production helpers.
+
+Every Showdown Pokemon (~1,300) is rated against the validated field: Gen 9's tiered Pokemon, picked exactly
+as the research picks them. All averages, z-scores and the 420/120 scale come from that field, so a field
+Pokemon gets the research's own number. Pokemon in Gen 9 use Gen 9 moves; the rest use moves from every gen.
+Ditto and Smeargle don't fit the model and are listed under "unrated" instead.
 
     python3 build_bbr.py --data gen9.json --source <showdown commit>   # writes bbr.json if anything changed
     python3 build_bbr.py ... --swift FILE                               # also writes the app's built-in copy
@@ -10,27 +16,31 @@ generations and checked on the sixth). The research behind it is in the app's "B
 
 gen9.json is Pokemon Showdown's current data (pokedex, formats-data, moves, abilities, typechart, learnsets),
 made by bbr/export_showdown.mjs. Run every day by the GitHub Action; it only recomputes when Showdown's data
-or the model changed, since the battle simulation takes several minutes.
+or the model changed, since the battle simulation takes several minutes. Tests: `pytest tests`
+(add --runslow for the parity check against the research).
 """
 import json, math, os, sys, time
 import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "bbr"))
 import bbrlib
-from bbrlib import ORD, TYPES, TI, sid, type_matrix, learnable
-from duel import duel_matrix, Side, pair_damage
+from bbrlib import ORD, TYPES, TI, sid, type_matrix, learnable, usable_abilities
+from duel import duel_matrix, default_abilities, Side, pair_damage
 
-MODEL = "2026-10-26"  # change when the weights or the parts change, so every Pokemon is recomputed
+MODEL = "2026-10-27"  # change when the weights or the parts change, so every Pokemon is recomputed
 SCHEMA = 1
 
-# Weights per standard deviation of each part (BBR Research/final_model.py).
+# Weights per standard deviation of each part (BBR Research/common.py SEL, fitted by final_model.py).
 WEIGHTS = {
-    "app_core": 1.9249, "typ_def_uniform": 0.1311, "typ_off": 0.3994, "duel": 0.8254, "st_minbulk": -0.3289,
-    "ab_rating": 0.3182, "knockoff": 0.2264, "screens": 0.1557, "hazards": 0.2162, "def_typing": 0.5448,
-    "prio": 0.2016,
+    "app_core": 1.93944, "typ_off": 0.31410, "duel": 1.23185, "ab_rating": 0.44676, "st_minbulk": -0.33907,
+    "sr_weak": -0.28761, "removal": 0.22965, "def_typing": 0.59186, "hazards": 0.21686, "ab_intimidate": -0.19517,
+    "prio": 0.13577,
 }
 HAZARDS = {"stealthrock", "spikes", "toxicspikes", "stickyweb", "stoneaxe", "ceaselessedge"}
-SCREENS = {"reflect", "lightscreen", "auroraveil"}
+REMOVAL = {"rapidspin", "defog", "mortalspin", "tidyup", "courtchange"}
+UNRATED = ["ditto", "smeargle"]  # Imposter / Sketch: no stats-and-learnset model fits them
+# Forms that always battle as another form: they get that form's rating.
+BATTLES_AS = {"palafin": "palafinhero", "terapagos": "terapagosterastal"}
 aRPT, aRST, aLRT = 53736.6, 52437.9, 47836.5
 APP_IMMUNE = {"levitate": "Ground", "flashfire": "Fire", "wellbakedbody": "Fire", "voltabsorb": "Electric",
               "lightningrod": "Electric", "motordrive": "Electric", "waterabsorb": "Water", "stormdrain": "Water",
@@ -64,68 +74,68 @@ def app_effect(a):
     return e
 
 
-def roster(data, research=False):
-    """Every Pokemon to rate, and which of them make up the field (the Pokemon everything is compared against).
-
-    Normal run: every Showdown Pokemon (not CAP), with moves from any generation (National Dex); the field is
-    everything with a National Dex tier. research=True reproduces the research setup: Gen 9 tiered Pokemon only."""
+def roster(data):
+    """Every Pokemon to rate, field first (field=True): the research's Gen 9 roster (bbrlib.roster), then every
+    other Showdown Pokemon (not CAP, Totem or Gmax). Pokemon in Gen 9 get Gen 9 moves, the rest National Dex moves."""
+    bbrlib.set_gendata(9, data)
     dex, fmt, ls = data["pokedex"], data["formats"], data["learnsets"]
-    mons = []
+    field = [dict(m, field=True) for m in bbrlib.roster(9)]
+    taken = {m["id"] for m in field}
+    rest = []
     for k, p in dex.items():
         f = fmt.get(k, {})
-        if p.get("num", 0) <= 0 or f.get("isNonstandard") in ("CAP", "Custom") or p.get("forme") in ("Totem", "Gmax"):
-            continue
-        tier = f.get("tier") if research else f.get("natDexTier")
-        if research and tier not in ORD:
+        if k in taken or p.get("num", 0) <= 0 or f.get("isNonstandard") in ("CAP", "Custom") \
+                or p.get("forme", "").endswith(("Totem", "Gmax")):
             continue
         s = p["baseStats"]
-        evos = [e for e in p.get("evos", []) if sid(e) in dex and fmt.get(sid(e), {}).get("isNonstandard") not in ("CAP", "Custom")]
-        mons.append(dict(id=k, name=p["name"], stats=[s["hp"], s["atk"], s["def"], s["spa"], s["spd"], s["spe"]],
-                         types=p["types"], abil=[sid(a) for a in p["abilities"].values()], nfe=bool(evos),
-                         weight=p.get("weightkg", 50), field=tier in ORD,
-                         moves=learnable(9, k, dex, ls, natdex=not research)))
-    return mons
+        evos = [e for e in p.get("evos", []) if sid(e) in fmt and fmt[sid(e)].get("tier") not in (None, "Illegal")]
+        rest.append(dict(id=k, name=p["name"], stats=[s["hp"], s["atk"], s["def"], s["spa"], s["spd"], s["spe"]],
+                         types=p["types"], abil=usable_abilities(9, p), nfe=bool(evos), weight=p.get("weightkg", 50),
+                         field=False, moves=learnable(9, k, dex, ls, natdex=bool(f.get("isNonstandard")))))
+    return field + rest
+
+
+def _mean_vs_field(W, mons, field):
+    """Each row's average over the field, leaving out the battle against itself."""
+    col = {m["id"]: j for j, m in enumerate(field)}
+    mask = np.ones(W.shape, bool)
+    for i, m in enumerate(mons):
+        if m["id"] in col:
+            mask[i, col[m["id"]]] = False
+    return (W * mask).sum(1) / mask.sum(1)
 
 
 def duel_scores(mons, field):
-    """Each Pokemon's win rate in the 1v1 simulation against the field, with its best ability."""
-    abr = bbrlib.gendata(9)["abilities"]
-    default = lambda m: max(m["abil"], key=lambda a: abr.get(a, {}).get("rating", 0)) if m["abil"] else ""
-    fab = [default(m) for m in field]
-    best, bestScore = [default(m) for m in mons], None
-    fieldIndex = {m["id"]: j for j, m in enumerate(field)}
-    def mean_vs_field(W):
-        mask = np.ones(W.shape, bool)
-        for i, m in enumerate(mons):
-            if m["id"] in fieldIndex:
-                mask[i, fieldIndex[m["id"]]] = False
-        return (W * mask).sum(1) / mask.sum(1)
+    """Each Pokemon's win rate in the 1v1 simulation against the field, with its best ability (duel.choose_abilities
+    with the field as the columns). Sets m["ability"]. Field Pokemon must be the first rows."""
+    nf = len(field)
+    assert [m["id"] for m in mons[:nf]] == [m["id"] for m in field]
+    default_f = default_abilities(9, field)
+    default = default_abilities(9, mons)
+    best, bestScore = list(default), None
     for k in range(3):
-        rowab = [m["abil"][k] if len(m["abil"]) > k else default(m) for m in mons]
-        sc = mean_vs_field(duel_matrix(9, mons, rowab, fab, quick=True, mons_col=field))
+        rowab = [m["abil"][k] if len(m["abil"]) > k else default[i] for i, m in enumerate(mons)]
+        sc = _mean_vs_field(duel_matrix(9, mons, rowab, default_f, quick=True, mons_col=field), mons, field)
         if bestScore is None:
-            bestScore, best = sc, list(rowab)
+            bestScore, best = sc.copy(), list(rowab)
         else:
             for i in range(len(mons)):
                 if sc[i] > bestScore[i] + 1e-9:
                     bestScore[i], best[i] = sc[i], rowab[i]
         print(f"  ability pass {k + 1}/3 done", file=sys.stderr, flush=True)
-    chosen = {m["id"]: a for m, a in zip(mons, best)}
-    for m in mons:
-        m["ability"] = chosen[m["id"]]
-    W = duel_matrix(9, mons, best, [chosen[m["id"]] for m in field], mons_col=field)
+    best = ["imposter" if "imposter" in m["abil"] else a for m, a in zip(mons, best)]
+    for m, a in zip(mons, best):
+        m["ability"] = a
+    W = duel_matrix(9, mons, best, best[:nf], mons_col=field)
     # Inside the field, average each battle with its mirror (A vs B and B vs A are the same battle).
-    rowOf = {m["id"]: i for i, m in enumerate(mons)}
-    rows = [rowOf[m["id"]] for m in field]
-    block = W[rows, :]
-    W[rows, :] = (block + (1 - block.T)) / 2
-    for i, m in enumerate(mons):
-        if m["ability"] == "imposter":
-            W[i, :] = .5
-    return mean_vs_field(W)
+    block = W[:nf, :]
+    W[:nf, :] = (block + (1 - block.T)) / 2
+    return _mean_vs_field(W, mons, field)
 
 
 def features(mons, field_mask, duel):
+    """The model's 11 parts for every Pokemon, with the field as the reference (research: baselines.bsr,
+    addfeat, features.utility_features, mech.mech_features)."""
     eff = type_matrix(9)
     abr = bbrlib.gendata(9)["abilities"]
     mv = bbrlib.gendata(9)["moves"]
@@ -154,49 +164,41 @@ def features(mons, field_mask, duel):
             if best is None or key > best[0]:
                 best = (key, r)
         raw[i] = best[1]
-    fm = np.array(field_mask)
+    fm = np.asarray(field_mask)
     zf = lambda v: (v - v[fm].mean()) / v[fm].std()
     parts = [zf(raw[:, k]) * 30 + 75 for k in range(3)]
     f["app_core"] = parts[0] + parts[1] + 2 * parts[2]
-    # Typing: the field's own types decide how often each attack type shows up.
+    # Defensive typing: the field's own types decide how often each attack type shows up.
     share = np.zeros(18)
     for m in field:
         for t in m["types"]:
             share[TI[t]] += 1
     share /= share.sum()
     for i, m in enumerate(mons):
-        ab = m.get("ability")
-        def mult(att):
-            v = np.prod([eff[TI[att], TI[t]] for t in m["types"]])
-            return 0 if ab and APP_IMMUNE.get(ab) == att else v
-        f["typ_def_uniform"][i] = -sum(math.log2(max(mult(a), .25)) for a in TYPES) / 18
+        prod = lambda t: np.prod([eff[t, TI[x]] for x in m["types"]])
         f["typ_off"][i] = sum(max(eff[TI[a], TI[d]] for a in m["types"]) for d in TYPES) / 18
-        f["def_typing"][i] = -sum(share[t] * math.log2(max(np.prod([eff[t, TI[x]] for x in m["types"]]), .25)) for t in range(18))
+        f["def_typing"][i] = -sum(share[t] * math.log2(max(prod(t), .25)) for t in range(18))
+        f["sr_weak"][i] = math.log2(max(prod(TI["Rock"]), .25))
         hp, at, de, sa, sd, sp = m["stats"]
         H = 2 * hp + 141
         f["st_minbulk"][i] = min(math.log(H * (2 * de + 36)), math.log(H * (2 * sd + 36)))
         f["ab_rating"][i] = max([abr.get(a, {}).get("rating", 0) for a in m["abil"]] or [0])
-        moves = {x for x in m["moves"] if not (mv.get(x) or {}).get("isNonstandard")}
-        f["knockoff"][i] = float("knockoff" in moves)
-        f["screens"][i] = float(bool(moves & SCREENS))
+        f["ab_intimidate"][i] = float("intimidate" in m["abil"])
+        moves = {x for x in m["moves"] if not (mv.get(x, {}) or {}).get("isNonstandard")}
         f["hazards"][i] = float(bool(moves & HAZARDS))
+        f["removal"][i] = float(bool(moves & REMOVAL))
     p = np.clip(duel, 1e-3, 1 - 1e-3)
     f["duel"] = np.log(p / (1 - p))
     # Priority: how hard its best priority move hits the field, on average.
-    R = Side(9, mons, [m["ability"] for m in mons])
     C = Side(9, field, [m["ability"] for m in field])
+    R = Side(9, mons, [m["ability"] for m in mons], field=C)
     d = pair_damage(R, C)
-    prio = np.minimum(np.maximum(d["prio_phys"], d["prio_spec"]), 1)
-    fieldIndex = {m["id"]: j for j, m in enumerate(field)}
-    for i, m in enumerate(mons):
-        mask = np.ones(len(field), bool)
-        if m["id"] in fieldIndex:
-            mask[fieldIndex[m["id"]]] = False
-        f["prio"][i] = prio[i, mask].mean()
+    f["prio"] = _mean_vs_field(np.minimum(np.maximum(d["prio_phys"], d["prio_spec"]), 1), mons, field)
     return f
 
 
 def ratings(mons, duel):
+    """BBR on the 420/120 scale, every z-score taken over the field."""
     fm = np.array([m["field"] for m in mons])
     f = features(mons, fm, duel)
     score = np.zeros(len(mons))
@@ -205,6 +207,26 @@ def ratings(mons, duel):
         sd = v[fm].std()
         score += w * ((v - v[fm].mean()) / sd if sd > 0 else 0)
     return (score - score[fm].mean()) / score[fm].std() * 120 + 420
+
+
+def built_now():
+    """Full UTC timestamp, so a same-day rebuild sorts after an earlier one (and after old day-only dates)."""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def make_doc(values, source, built):
+    """bbr.json's content from {id: BBR}: rounded and kept between 0 and 999 (only joke-strong forms like Eternamax
+    Eternatus go above, a few babies go below 0); battle-as forms copied; Ditto and Smeargle listed as unrated."""
+    table = {k: int(round(min(999, max(0, float(v))))) for k, v in values.items() if k not in UNRATED}
+    for k, form in BATTLES_AS.items():
+        if form in table:
+            table[k] = table[form]
+    return {"schema": SCHEMA, "model": MODEL, "source": source, "built": built, "ratings": table,
+            "unrated": list(UNRATED)}
+
+
+def to_json(doc):
+    return json.dumps(doc, separators=(",", ":"), sort_keys=True)
 
 
 def write_swift(doc, text, path):
@@ -233,34 +255,27 @@ def main():
         return
     data_path = args[args.index("--data") + 1]
     source = args[args.index("--source") + 1] if "--source" in args else "unknown"
-    research = "--research" in args
-    out = "bbr.json"
-    if not research and os.path.exists(out) and "--force" not in args:
+    out = args[args.index("--out") + 1] if "--out" in args else "bbr.json"
+    if os.path.exists(out) and "--force" not in args:
         old = json.load(open(out))
         if old.get("source") == source and old.get("model") == MODEL:
-            print("bbr.json is already up to date", file=sys.stderr)
+            print(f"{out} is already up to date", file=sys.stderr)
             return
     bbrlib.load_gendata(9, data_path)
     started = time.time()
-    mons = roster(bbrlib.gendata(9), research=research)
+    mons = roster(bbrlib.gendata(9))
     field = [m for m in mons if m["field"]]
     print(f"{len(mons)} Pokemon, field of {len(field)}", file=sys.stderr, flush=True)
-    duel = duel_scores(mons, field)
-    bbr = ratings(mons, duel)
-    # Kept between 0 and 999 (only joke-strong forms like Eternamax Eternatus go above, a few babies go below 0).
-    table = {m["id"]: int(round(min(999, max(0, v)))) for m, v in zip(mons, bbr)}
+    bbr = ratings(mons, duel_scores(mons, field))
     print(f"done in {time.time() - started:.0f} s", file=sys.stderr)
-    if research:
-        for name in ("clefable", "gholdengo", "kingambit", "slaking", "regigigas", "heatran", "torkoal", "ironvaliant"):
-            print(f"  {name}: {table.get(name)}", file=sys.stderr)
-        return
-    doc = {"schema": SCHEMA, "model": MODEL, "source": source, "built": time.strftime("%Y-%m-%d"), "ratings": table}
-    text = json.dumps(doc, separators=(",", ":"), sort_keys=True)
+    doc = make_doc({m["id"]: v for m, v in zip(mons, bbr)}, source, built_now())
+    text = to_json(doc)
     with open(out, "w") as fh:
         fh.write(text)
-    print(f"bbr.json: {len(table)} Pokemon, {len(text) // 1024} KB", file=sys.stderr)
+    print(f"{out}: {len(doc['ratings'])} Pokemon, {len(text) // 1024} KB", file=sys.stderr)
     if "--swift" in args:
         write_swift(doc, text, args[args.index("--swift") + 1])
+
 
 if __name__ == "__main__":
     main()
