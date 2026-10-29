@@ -4,6 +4,12 @@ Usage stats for the Poke Battle Buddy (iOS) Team Builder: the most-used Pokémon
 competitive format, with their common moves, items, abilities, Tera types, EV spreads, teammates, and checks and counters.
 
 - `meta.json` is what the app downloads (about once a day per device).
+- `sets.json` is the most popular set of every Pokémon in each format, for the Pokédex's SET tab (also downloaded at
+  most once a day). `meta.json` keeps only the top 50 of the newest month; `sets.json` keeps every Pokémon that reached
+  1% usage in some month since 2022-11, with the set from the newest such month and that month (`"mo": "2026-09"`).
+  Same fields as `meta.json`, same formats and the same 1500 rating cutoff. `build_sets.py` merges each new month over
+  the old file, so a Pokémon missing this month keeps its last set. `build_sets.py --backfill 2022-11` rebuilds it from
+  every month since then (it was made that way once).
 - `bbr.json` is every Pokémon's BBR (Battle Buddy Rating): one number for how good it is in singles battles, on
   Smogon BSR's scale (average 420). `build_bbr.py` makes it from Pokémon Showdown's data with a one-on-one battle
   simulation of every pair of Pokémon plus stats, typing, abilities and key moves, weighted by how well each part
@@ -17,10 +23,10 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
   - **Forms.** Palafin gets Palafin-Hero's rating and Terapagos gets Terapagos-Terastal's (they always battle in those forms).
   - **Unrated.** `"unrated": ["ditto", "smeargle"]` lists Pokémon no model of stats and learnsets fits (Imposter, Sketch);
     they're left out of `ratings`. `built` is a UTC timestamp (`2026-10-27T18:04:00Z`), so a same-day rebuild sorts later.
-  - **Tests.** `pip install numpy pytest && pytest tests` (fast: field selection, forms, unrated list, file shape).
+  - **Tests.** `pip install numpy pytest && pytest tests` (fast: field selection, forms, unrated list, file shape, plus meta.json's output and sets.json's merging).
     `pytest --runslow tests/test_parity.py` (a few minutes) checks that production matches the research's Gen 9 ratings
     (`tests/fixtures/research_gen9_ratings.json`); it needs the research's `gen9.json` (`BBR_RESEARCH_GEN9`, default `/tmp/bbr/gen/gen9.json`).
-- `build_meta.py` builds meta.json. A [GitHub Action](.github/workflows/update.yml) runs it every day, finds the newest month,
+- `build_meta.py` builds meta.json. A [GitHub Action](.github/workflows/update.yml) runs it (and `build_sets.py`) every day, finds the newest month,
   generation and most-played VGC/Champions formats on its own, and commits only when something changed.
 
 ## Credits

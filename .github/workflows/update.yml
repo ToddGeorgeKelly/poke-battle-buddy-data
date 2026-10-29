@@ -1,6 +1,7 @@
-# Rebuilds meta.json (usage stats) and bbr.json (every Pokemon's BBR) every day. Smogon posts new usage stats once a
-# month and Showdown's data changes now and then, so most runs find nothing new and commit nothing. bbr.json is only
-# recomputed when Showdown's data (or the BBR model) changed, since its battle simulation takes a while.
+# Rebuilds meta.json (usage stats), sets.json (every Pokemon's set) and bbr.json (every Pokemon's BBR) every day. Smogon
+# posts new usage stats once a month and Showdown's data changes now and then, so most runs find nothing new and commit
+# nothing. bbr.json is only recomputed when Showdown's data (or the BBR model) changed, since its battle simulation takes
+# a while.
 # Can also be run by hand from the Actions tab ("Run workflow").
 name: Update usage stats
 
@@ -26,6 +27,8 @@ jobs:
           node-version: "24"
       - name: Build meta.json
         run: python3 build_meta.py
+      - name: Build sets.json
+        run: python3 build_sets.py   # does nothing unless Smogon posted a new month
       - name: Build bbr.json
         run: |
           pip install numpy
@@ -37,8 +40,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet meta.json bbr.json; then
-            git add meta.json bbr.json
+          if ! git diff --quiet meta.json sets.json bbr.json; then
+            git add meta.json sets.json bbr.json
             git commit -m "Usage stats for $(python3 -c 'import json; print(json.load(open("meta.json"))["month"])'), BBR built $(python3 -c 'import json; print(json.load(open("bbr.json"))["built"])')"
             git push
           # GitHub pauses scheduled jobs after 60 days without commits, so leave a small one every 50 days.

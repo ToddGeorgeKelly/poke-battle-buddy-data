@@ -32,9 +32,13 @@ def fetch(url, as_json=True, tries=4):
             time.sleep(10 * (attempt + 1))
 
 
+def posted_months():
+    """Every month folder on Smogon's stats page, oldest first."""
+    return sorted(set(re.findall(r'href="(\d{4}-\d{2})/"', fetch(f"{STATS}/", as_json=False))))
+
+
 def newest_month():
-    months = sorted(set(re.findall(r'href="(\d{4}-\d{2})/"', fetch(f"{STATS}/", as_json=False))))
-    for month in reversed(months):
+    for month in reversed(posted_months()):
         listing = fetch(f"{STATS}/{month}/chaos/", as_json=False)
         if re.search(r'href="gen\d+ou-1500\.json"', listing):
             return month, listing
@@ -67,8 +71,8 @@ def top(d, n):
     return [k for k, _ in sorted(d.items(), key=lambda kv: -kv[1])[:n]]
 
 
-def main():
-    month, listing = newest_month()
+def chosen_formats(month, listing):
+    """The formats to show: the singles list plus the most-played VGC/Champions formats, as (gen, [(id, cap)])."""
     gen = max(int(g) for g in re.findall(r'href="gen(\d+)ou-1500\.json"', listing))
     available = set(re.findall(r'href="(gen\d+[a-z0-9]+)-1500\.json"', listing))
 
@@ -82,24 +86,35 @@ def main():
     for fid in doubles:
         battles[fid] = fetch(f"{STATS}/{month}/chaos/{fid}-1500.json")["info"]["number of battles"]
     chosen += [(fid, None) for fid in sorted(doubles, key=lambda f: -battles[f])[:DOUBLES_PICKS]]
+    return gen, chosen
+
+
+def set_of(v):
+    """One Pokemon's most popular set from its chaos stats: the fields the app reads (u, a, i, m, t, s, tm, cc)."""
+    # Each check is {"n", "p", "d"} (older months: a list [n, p, d]); rank by how often it wins, minus its spread.
+    score = lambda c: c["p"] - 4 * c["d"] if isinstance(c, dict) else c[1] - 4 * c[2]
+    checks = sorted(v.get("Checks and Counters", {}).items(), key=lambda kv: -score(kv[1]))
+    return {
+        "u": round(v["usage"] * 100, 1),
+        "a": top(v.get("Abilities", {}), 2),
+        "i": top(v.get("Items", {}), 3),
+        "m": [m for m in top(v.get("Moves", {}), 9) if m][:8],
+        "t": top(v.get("Tera Types", {}), 2),
+        "s": top(v.get("Spreads", {}), 1)[0] if v.get("Spreads") else "",
+        "tm": top(v.get("Teammates", {}), 8),
+        "cc": [c for c, _ in checks[:6]],
+    }
+
+
+def main():
+    month, listing = newest_month()
+    gen, chosen = chosen_formats(month, listing)
 
     formats = []
     for fid, cap in chosen:
         data = fetch(f"{STATS}/{month}/chaos/{fid}-1500.json")
         mons = sorted(data["data"].items(), key=lambda kv: -kv[1]["usage"])[:TOP]
-        pokemon = {}
-        for mon, v in mons:
-            checks = sorted(v.get("Checks and Counters", {}).items(), key=lambda kv: -(kv[1]["p"] - 4 * kv[1]["d"]))
-            pokemon[mon] = {
-                "u": round(v["usage"] * 100, 1),
-                "a": top(v.get("Abilities", {}), 2),
-                "i": top(v.get("Items", {}), 3),
-                "m": [m for m in top(v.get("Moves", {}), 9) if m][:8],
-                "t": top(v.get("Tera Types", {}), 2),
-                "s": top(v.get("Spreads", {}), 1)[0] if v.get("Spreads") else "",
-                "tm": top(v.get("Teammates", {}), 8),
-                "cc": [c for c, _ in checks[:6]],
-            }
+        pokemon = {mon: set_of(v) for mon, v in mons}
         formats.append({"id": fid, "name": format_name(fid, gen), "cap": cap,
                         "battles": data["info"]["number of battles"], "pokemon": pokemon})
         print(f"{fid}: {len(pokemon)} Pokemon, {data['info']['number of battles']} battles", file=sys.stderr)
