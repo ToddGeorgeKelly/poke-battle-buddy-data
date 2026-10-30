@@ -35,7 +35,8 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
   - **Data.** `node bbr/export_showdown.mjs ps/data gen` turns a checkout of Showdown's `data/` (with `data/mods/gen4`–`gen8`)
     into `gen/gen4.json` … `gen9.json`, each gen's mods applied the way the research's `load.mjs` does;
     `python3 build_bbr.py --data gen --source <commit>` rates all six gens (about half an hour).
-  - **Tests.** `pip install numpy pytest && pytest tests` (fast: field selection per gen, forms, unrated list, file shape,
+  - **Tests.** Set up once with `python3 -m venv .venv && .venv/bin/pip install numpy pytest` (`.venv` is gitignored),
+    then `.venv/bin/python -m pytest tests` (fast: field selection per gen, forms, unrated list, file shape,
     the per-gen export, plus meta.json's output and sets.json's merging). `pytest --runslow tests/test_parity.py`
     (about 20 minutes) checks that production matches the research's ratings in every gen
     (`tests/fixtures/research_gen<g>_ratings.json`, made by `tests/fixtures/research_ref.py`); it needs the research's

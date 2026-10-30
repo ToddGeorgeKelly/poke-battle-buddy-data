@@ -36,6 +36,10 @@ jobs:
           git -C ps sparse-checkout set --no-cone '/data/*.ts' '/data/mods/gen[4-8]/*.ts'
           node bbr/export_showdown.mjs ps/data gen   # gen/gen4.json ... gen9.json, each gen's mods applied
           python3 build_bbr.py --data gen --source "$(git -C ps log -1 --format=%H)"
+      - name: Test before committing
+        run: |
+          pip install pytest
+          python3 -m pytest -q tests   # includes tests/test_published.py: the new bbr.json still has every gen
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
