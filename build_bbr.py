@@ -1,23 +1,29 @@
-"""Builds bbr.json: every Pokemon's BBR (Battle Buddy Rating), for Poke Battle Buddy.
+"""Builds bbr.json: every Pokemon's BBR (Battle Buddy Rating), for Poke Battle Buddy, in Generations 4-9.
 
 BBR is one number for how good a Pokemon is in singles battles, on BSR's scale (average 420, standard deviation 120).
 It adds up 11 parts, each weighted by how well it predicted Smogon's tiers in Generations 4-9 (fitted on five
 generations and checked on the sixth). The research behind it is in the app's "BBR Research" folder
 (BBR_RESEARCH.md, part 3); bbr/bbrlib.py and bbr/duel.py are copies of the research's, plus production helpers.
 
-Every Showdown Pokemon (~1,300) is rated against the validated field: Gen 9's tiered Pokemon, picked exactly
-as the research picks them. All averages, z-scores and the 420/120 scale come from that field, so a field
-Pokemon gets the research's own number. Pokemon in Gen 9 use Gen 9 moves; the rest use moves from every gen.
-Ditto and Smeargle don't fit the model and are listed under "unrated" instead.
+Each generation is rated against its own validated field: that gen's tiered Pokemon, picked exactly as the research
+picks them, with that gen's moves, abilities, type chart and battle mechanics. All averages, z-scores and the 420/120
+scale come from that field, so a field Pokemon gets the research's own number for that gen. The weights are the same
+in every gen (the research fitted one set on all six). Gen 9 rates every Showdown Pokemon (~1,300): Pokemon in Gen 9
+use Gen 9 moves, the rest moves from every gen. Gens 4-8 rate the Pokemon in that gen's games (its NFEs and other
+untiered Pokemon too). Ditto and Smeargle don't fit the model and are listed under "unrated" instead.
 
-    python3 build_bbr.py --data gen9.json --source <showdown commit>   # writes bbr.json if anything changed
-    python3 build_bbr.py ... --swift FILE                               # also writes the app's built-in copy
-    python3 build_bbr.py --swift-only FILE                              # only the app's copy, from bbr.json
+bbr.json keeps Gen 9 at the top level (`ratings`, `unrated`), as before the older gens, and adds
+`"gens": {"4": {"ratings": ..., "unrated": ...}, ..., "8": ...}`.
 
-gen9.json is Pokemon Showdown's current data (pokedex, formats-data, moves, abilities, typechart, learnsets),
-made by bbr/export_showdown.mjs. Run every day by the GitHub Action; it only recomputes when Showdown's data
-or the model changed, since the battle simulation takes several minutes. Tests: `pytest tests`
-(add --runslow for the parity check against the research).
+    python3 build_bbr.py --data gen --source <showdown commit>   # writes bbr.json if anything changed
+    python3 build_bbr.py ... --swift FILE                         # also writes the app's built-in copy
+    python3 build_bbr.py --swift-only FILE                        # only the app's copy, from bbr.json
+
+gen/ holds gen4.json ... gen9.json, Pokemon Showdown's current data for each gen (pokedex, formats-data, moves,
+abilities, typechart, learnsets, with that gen's mods applied), made by bbr/export_showdown.mjs. Run every day by
+the GitHub Action; it only recomputes when Showdown's data or the model changed (or bbr.json lacks a gen), since the
+battle simulation takes about half an hour for all six gens. Tests: `pytest tests` (add --runslow for the parity
+check against the research, every gen).
 """
 import json, math, os, sys, time
 import numpy as np
@@ -29,6 +35,7 @@ from duel import duel_matrix, default_abilities, Side, pair_damage
 
 MODEL = "2026-10-27"  # change when the weights or the parts change, so every Pokemon is recomputed
 SCHEMA = 1
+OLDER_GENS = (4, 5, 6, 7, 8)  # rated too, each against its own field, under "gens"
 
 # Weights per standard deviation of each part (BBR Research/common.py SEL, fitted by final_model.py).
 WEIGHTS = {
@@ -74,24 +81,26 @@ def app_effect(a):
     return e
 
 
-def roster(data):
-    """Every Pokemon to rate, field first (field=True): the research's Gen 9 roster (bbrlib.roster), then every
-    other Showdown Pokemon (not CAP, Totem or Gmax). Pokemon in Gen 9 get Gen 9 moves, the rest National Dex moves."""
-    bbrlib.set_gendata(9, data)
+def roster(data, g=9):
+    """Every Pokemon to rate in generation g, field first (field=True): the research's roster for g (bbrlib.roster),
+    then the other Pokemon (not CAP, Totem or Gmax). Gen 9 rates every Showdown Pokemon, the ones not in Gen 9 with
+    National Dex moves. Gens 4-8 only rate Pokemon in that gen's games: in its tiers (a mod's formats-data lists
+    only those) and not cut from them ("Past", e.g. Gen 8's Dexit), with that gen's moves and abilities."""
+    bbrlib.set_gendata(g, data)
     dex, fmt, ls = data["pokedex"], data["formats"], data["learnsets"]
-    field = [dict(m, field=True) for m in bbrlib.roster(9)]
+    field = [dict(m, field=True) for m in bbrlib.roster(g)]
     taken = {m["id"] for m in field}
     rest = []
     for k, p in dex.items():
         f = fmt.get(k, {})
         if k in taken or p.get("num", 0) <= 0 or f.get("isNonstandard") in ("CAP", "Custom") \
-                or p.get("forme", "").endswith(("Totem", "Gmax")):
+                or p.get("forme", "").endswith(("Totem", "Gmax")) or g < 9 and (k not in fmt or f.get("isNonstandard")):
             continue
         s = p["baseStats"]
         evos = [e for e in p.get("evos", []) if sid(e) in fmt and fmt[sid(e)].get("tier") not in (None, "Illegal")]
         rest.append(dict(id=k, name=p["name"], stats=[s["hp"], s["atk"], s["def"], s["spa"], s["spd"], s["spe"]],
-                         types=p["types"], abil=usable_abilities(9, p), nfe=bool(evos), weight=p.get("weightkg", 50),
-                         field=False, moves=learnable(9, k, dex, ls, natdex=bool(f.get("isNonstandard")))))
+                         types=p["types"], abil=usable_abilities(g, p), nfe=bool(evos), weight=p.get("weightkg", 50),
+                         field=False, moves=learnable(g, k, dex, ls, natdex=bool(f.get("isNonstandard")))))
     return field + rest
 
 
@@ -105,17 +114,17 @@ def _mean_vs_field(W, mons, field):
     return (W * mask).sum(1) / mask.sum(1)
 
 
-def duel_scores(mons, field):
-    """Each Pokemon's win rate in the 1v1 simulation against the field, with its best ability (duel.choose_abilities
-    with the field as the columns). Sets m["ability"]. Field Pokemon must be the first rows."""
+def duel_scores(mons, field, g=9):
+    """Each Pokemon's win rate in gen g's 1v1 simulation against the field, with its best ability
+    (duel.choose_abilities with the field as the columns). Sets m["ability"]. Field Pokemon must be the first rows."""
     nf = len(field)
     assert [m["id"] for m in mons[:nf]] == [m["id"] for m in field]
-    default_f = default_abilities(9, field)
-    default = default_abilities(9, mons)
+    default_f = default_abilities(g, field)
+    default = default_abilities(g, mons)
     best, bestScore = list(default), None
     for k in range(3):
         rowab = [m["abil"][k] if len(m["abil"]) > k else default[i] for i, m in enumerate(mons)]
-        sc = _mean_vs_field(duel_matrix(9, mons, rowab, default_f, quick=True, mons_col=field), mons, field)
+        sc = _mean_vs_field(duel_matrix(g, mons, rowab, default_f, quick=True, mons_col=field), mons, field)
         if bestScore is None:
             bestScore, best = sc.copy(), list(rowab)
         else:
@@ -126,19 +135,20 @@ def duel_scores(mons, field):
     best = ["imposter" if "imposter" in m["abil"] else a for m, a in zip(mons, best)]
     for m, a in zip(mons, best):
         m["ability"] = a
-    W = duel_matrix(9, mons, best, best[:nf], mons_col=field)
+    W = duel_matrix(g, mons, best, best[:nf], mons_col=field)
     # Inside the field, average each battle with its mirror (A vs B and B vs A are the same battle).
     block = W[:nf, :]
     W[:nf, :] = (block + (1 - block.T)) / 2
     return _mean_vs_field(W, mons, field)
 
 
-def features(mons, field_mask, duel):
-    """The model's 11 parts for every Pokemon, with the field as the reference (research: baselines.bsr,
+def features(mons, field_mask, duel, g=9):
+    """The model's 11 parts for every Pokemon in gen g, with the field as the reference (research: baselines.bsr,
     addfeat, features.utility_features, mech.mech_features)."""
-    eff = type_matrix(9)
-    abr = bbrlib.gendata(9)["abilities"]
-    mv = bbrlib.gendata(9)["moves"]
+    eff = type_matrix(g)
+    nt = 18 if g >= 6 else 17  # no Fairy type before Gen 6
+    abr = bbrlib.gendata(g)["abilities"]
+    mv = bbrlib.gendata(g)["moves"]
     field = [m for m, f in zip(mons, field_mask) if f]
     n = len(mons)
     f = {k: np.zeros(n) for k in WEIGHTS}
@@ -176,7 +186,7 @@ def features(mons, field_mask, duel):
     share /= share.sum()
     for i, m in enumerate(mons):
         prod = lambda t: np.prod([eff[t, TI[x]] for x in m["types"]])
-        f["typ_off"][i] = sum(max(eff[TI[a], TI[d]] for a in m["types"]) for d in TYPES) / 18
+        f["typ_off"][i] = sum(max(eff[TI[a], TI[d]] for a in m["types"]) for d in TYPES[:nt]) / nt
         f["def_typing"][i] = -sum(share[t] * math.log2(max(prod(t), .25)) for t in range(18))
         f["sr_weak"][i] = math.log2(max(prod(TI["Rock"]), .25))
         hp, at, de, sa, sd, sp = m["stats"]
@@ -190,17 +200,18 @@ def features(mons, field_mask, duel):
     p = np.clip(duel, 1e-3, 1 - 1e-3)
     f["duel"] = np.log(p / (1 - p))
     # Priority: how hard its best priority move hits the field, on average.
-    C = Side(9, field, [m["ability"] for m in field])
-    R = Side(9, mons, [m["ability"] for m in mons], field=C)
+    C = Side(g, field, [m["ability"] for m in field])
+    R = Side(g, mons, [m["ability"] for m in mons], field=C)
     d = pair_damage(R, C)
     f["prio"] = _mean_vs_field(np.minimum(np.maximum(d["prio_phys"], d["prio_spec"]), 1), mons, field)
     return f
 
 
-def ratings(mons, duel):
-    """BBR on the 420/120 scale, every z-score taken over the field."""
+def ratings(mons, duel, g=9):
+    """BBR on the 420/120 scale, every z-score taken over gen g's field. Same weights in every gen: the research
+    fitted one set on all six."""
     fm = np.array([m["field"] for m in mons])
-    f = features(mons, fm, duel)
+    f = features(mons, fm, duel, g)
     score = np.zeros(len(mons))
     for k, w in WEIGHTS.items():
         v = f[k]
@@ -214,15 +225,29 @@ def built_now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
-def make_doc(values, source, built):
-    """bbr.json's content from {id: BBR}: rounded and kept between 0 and 999 (only joke-strong forms like Eternamax
-    Eternatus go above, a few babies go below 0); battle-as forms copied; Ditto and Smeargle listed as unrated."""
+def _table(values):
+    """{id: BBR} rounded and kept between 0 and 999 (only joke-strong forms like Eternamax Eternatus go above, a few
+    babies go below 0), without Ditto and Smeargle, battle-as forms copied where that form is rated."""
     table = {k: int(round(min(999, max(0, float(v))))) for k, v in values.items() if k not in UNRATED}
     for k, form in BATTLES_AS.items():
         if form in table:
             table[k] = table[form]
-    return {"schema": SCHEMA, "model": MODEL, "source": source, "built": built, "ratings": table,
-            "unrated": list(UNRATED)}
+    return table
+
+
+def make_doc(values, source, built, gens=None):
+    """bbr.json's content from Gen 9's {id: BBR} and the older gens' {gen: {id: BBR}}. Gen 9 stays at the top level
+    (`ratings`, `unrated`) so app versions that predate the older gens keep working; Gens 4-8 go under `gens`."""
+    older = {str(g): {"ratings": _table(v), "unrated": list(UNRATED)} for g, v in sorted((gens or {}).items())}
+    return {"schema": SCHEMA, "model": MODEL, "source": source, "built": built, "ratings": _table(values),
+            "unrated": list(UNRATED), "gens": older}
+
+
+def up_to_date(old, source):
+    """bbr.json needs no rebuild: same Showdown data, same model, and every older gen in it (a file from before
+    the older gens has no `gens`)."""
+    return old.get("source") == source and old.get("model") == MODEL \
+        and set(old.get("gens", {})) == {str(g) for g in OLDER_GENS}
 
 
 def to_json(doc):
@@ -256,23 +281,25 @@ def main():
     data_path = args[args.index("--data") + 1]
     source = args[args.index("--source") + 1] if "--source" in args else "unknown"
     out = args[args.index("--out") + 1] if "--out" in args else "bbr.json"
-    if os.path.exists(out) and "--force" not in args:
-        old = json.load(open(out))
-        if old.get("source") == source and old.get("model") == MODEL:
-            print(f"{out} is already up to date", file=sys.stderr)
-            return
-    bbrlib.load_gendata(9, data_path)
-    started = time.time()
-    mons = roster(bbrlib.gendata(9))
-    field = [m for m in mons if m["field"]]
-    print(f"{len(mons)} Pokemon, field of {len(field)}", file=sys.stderr, flush=True)
-    bbr = ratings(mons, duel_scores(mons, field))
-    print(f"done in {time.time() - started:.0f} s", file=sys.stderr)
-    doc = make_doc({m["id"]: v for m, v in zip(mons, bbr)}, source, built_now())
+    if os.path.exists(out) and "--force" not in args and up_to_date(json.load(open(out)), source):
+        print(f"{out} is already up to date", file=sys.stderr)
+        return
+    values = {}
+    for g in (9,) + OLDER_GENS:
+        bbrlib.load_gendata(g, os.path.join(data_path, f"gen{g}.json"))
+        started = time.time()
+        mons = roster(bbrlib.gendata(g), g)
+        field = [m for m in mons if m["field"]]
+        print(f"Gen {g}: {len(mons)} Pokemon, field of {len(field)}", file=sys.stderr, flush=True)
+        bbr = ratings(mons, duel_scores(mons, field, g), g)
+        values[g] = {m["id"]: v for m, v in zip(mons, bbr)}
+        print(f"Gen {g} done in {time.time() - started:.0f} s", file=sys.stderr, flush=True)
+    doc = make_doc(values.pop(9), source, built_now(), values)
     text = to_json(doc)
     with open(out, "w") as fh:
         fh.write(text)
-    print(f"{out}: {len(doc['ratings'])} Pokemon, {len(text) // 1024} KB", file=sys.stderr)
+    counts = ", ".join(f"Gen {g} {len(v['ratings'])}" for g, v in doc["gens"].items())
+    print(f"{out}: {len(doc['ratings'])} Pokemon ({counts}), {len(text) // 1024} KB", file=sys.stderr)
     if "--swift" in args:
         write_swift(doc, text, args[args.index("--swift") + 1])
 

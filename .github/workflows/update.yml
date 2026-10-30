@@ -1,7 +1,7 @@
 # Rebuilds meta.json (usage stats), sets.json (every Pokemon's set) and bbr.json (every Pokemon's BBR) every day. Smogon
 # posts new usage stats once a month and Showdown's data changes now and then, so most runs find nothing new and commit
-# nothing. bbr.json is only recomputed when Showdown's data (or the BBR model) changed, since its battle simulation takes
-# a while.
+# nothing. bbr.json (Gens 4-9) is only recomputed when Showdown's data (or the BBR model) changed, since its battle
+# simulation takes a while (about half an hour for all six gens).
 # Can also be run by hand from the Actions tab ("Run workflow").
 name: Update usage stats
 
@@ -16,7 +16,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150   # the BBR simulation of all six gens takes about half an hour, longer on a slow runner
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,9 +33,9 @@ jobs:
         run: |
           pip install numpy
           git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/smogon/pokemon-showdown.git ps
-          git -C ps sparse-checkout set --no-cone '/data/*.ts'
-          node bbr/export_showdown.mjs ps/data gen9.json
-          python3 build_bbr.py --data gen9.json --source "$(git -C ps log -1 --format=%H)"
+          git -C ps sparse-checkout set --no-cone '/data/*.ts' '/data/mods/gen[4-8]/*.ts'
+          node bbr/export_showdown.mjs ps/data gen   # gen/gen4.json ... gen9.json, each gen's mods applied
+          python3 build_bbr.py --data gen --source "$(git -C ps log -1 --format=%H)"
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"

@@ -29,6 +29,24 @@ def test_gen9_pokemon_use_gen9_moves_and_others_every_gen(tiny):
     assert mons["deltamega"]["moves"] == {"tackle", "pursuit"}
 
 
+def test_older_gen_field_is_that_gens_tiered_roster_then_its_other_pokemon(tiny_old):
+    mons = build_bbr.roster(tiny_old, g=7)
+    n = sum(m["field"] for m in mons)
+    assert all(m["field"] for m in mons[:n])
+    assert sorted(ids(mons[:n])) == ["alpha", "beta", "ditto"]
+    # Only Pokemon in that gen's games: Delta has no entry in its tiers, Delta-Mega is "Past"; no CAP or Gmax.
+    assert sorted(ids(mons[n:])) == ["gamma", "palafinhero"]
+
+
+def test_older_gen_pokemon_use_that_gens_moves_and_abilities(tiny_old):
+    mons = {m["id"]: m for m in build_bbr.roster(tiny_old, g=7)}
+    assert mons["alpha"]["moves"] == {"pursuit"}            # learned in Gen 7; Tackle only from Gen 9 on
+    assert mons["ditto"]["abil"] == ["limber", "imposter"]
+    mons = {m["id"]: m for m in build_bbr.roster(tiny_old, g=4)}
+    assert mons["alpha"]["moves"] == set()
+    assert mons["ditto"]["abil"] == ["limber"]               # no Hidden Abilities before Gen 5
+
+
 # ---------------------------------------------------------------- forms, unrated, output
 def test_palafin_and_terapagos_get_their_battle_forms_rating():
     doc = build_bbr.make_doc({"palafin": 300, "palafinhero": 650, "terapagos": 400, "terapagosterastal": 610,
@@ -52,7 +70,7 @@ def test_ratings_are_rounded_and_held_between_0_and_999():
 def test_output_json_shape():
     doc = build_bbr.make_doc({"pikachu": 200.2}, source="abc123", built=build_bbr.built_now())
     doc = json.loads(build_bbr.to_json(doc))
-    assert set(doc) == {"schema", "model", "source", "built", "ratings", "unrated"}
+    assert set(doc) == {"schema", "model", "source", "built", "ratings", "unrated", "gens"}
     assert doc["schema"] == 1 and doc["source"] == "abc123" and isinstance(doc["model"], str)
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", doc["built"])
     assert doc["ratings"] == {"pikachu": 200}
@@ -62,3 +80,31 @@ def test_built_timestamp_still_sorts_after_old_day_only_builds():
     # Old app versions compare `built` strings with > / >= against day-only dates like "2026-10-26".
     assert "2026-10-27T00:00:00Z" > "2026-10-27" > "2026-10-26"
     assert build_bbr.built_now() > "2026-10-26"
+
+
+# ---------------------------------------------------------------- Gens 4-8
+def test_older_gens_go_under_gens_each_with_its_own_ratings_and_unrated_list():
+    doc = build_bbr.make_doc({"pikachu": 200.2}, source="abc", built="2026-10-27T18:04:00Z",
+                             gens={4: {"garchomp": 601.4, "ditto": 90, "smeargle": 300}, 8: {"garchomp": 1200}})
+    doc = json.loads(build_bbr.to_json(doc))
+    assert doc["ratings"] == {"pikachu": 200} and doc["unrated"] == ["ditto", "smeargle"]  # Gen 9, as before
+    assert doc["gens"] == {"4": {"ratings": {"garchomp": 601}, "unrated": ["ditto", "smeargle"]},
+                           "8": {"ratings": {"garchomp": 999}, "unrated": ["ditto", "smeargle"]}}
+
+
+def test_battle_forms_are_copied_in_a_gen_only_where_they_exist():
+    doc = build_bbr.make_doc({}, source="abc", built="2026-10-27T18:04:00Z",
+                             gens={8: {"palafin": 300, "palafinhero": 650}, 7: {"pikachu": 200}})
+    assert doc["gens"]["8"]["ratings"]["palafin"] == 650
+    assert doc["gens"]["7"]["ratings"] == {"pikachu": 200}
+
+
+def test_rebuilds_unless_same_source_and_model_and_every_older_gen_is_there():
+    doc = build_bbr.make_doc({"a": 1}, source="abc", built="2026-10-27T18:04:00Z",
+                             gens={g: {"a": 1} for g in build_bbr.OLDER_GENS})
+    assert build_bbr.up_to_date(doc, "abc")
+    assert not build_bbr.up_to_date(doc, "def")
+    assert not build_bbr.up_to_date(dict(doc, model="2026-01-01"), "abc")
+    assert not build_bbr.up_to_date({k: v for k, v in doc.items() if k != "gens"}, "abc")  # a Gen 9-only bbr.json
+    doc["gens"].pop("6")
+    assert not build_bbr.up_to_date(doc, "abc")

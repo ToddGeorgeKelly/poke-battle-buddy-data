@@ -5,8 +5,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "bbr"))
 
-# The research's Gen 9 data (the same Showdown export the research model was fitted and checked on).
-RESEARCH_GEN9 = os.environ.get("BBR_RESEARCH_GEN9", "/tmp/bbr/gen/gen9.json")
+# The research's per-gen data, gen4.json ... gen9.json (the same Showdown export the research model was fitted and
+# checked on).
+RESEARCH_GEN = os.environ.get("BBR_RESEARCH_GEN", "/tmp/bbr/gen")
 
 
 def pytest_addoption(parser):
@@ -14,7 +15,7 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "slow: runs the battle simulation on the full Gen 9 field")
+    config.addinivalue_line("markers", "slow: runs the battle simulation on a full field")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -69,3 +70,16 @@ TINY = dict(
 @pytest.fixture
 def tiny():
     return copy.deepcopy(TINY)
+
+
+@pytest.fixture
+def tiny_old():
+    """TINY as an older generation's data: a mod's formats-data lists only the Pokemon in that gen (Delta isn't),
+    Gen 8 marks the ones cut from its games "Past", and Pursuit still exists."""
+    d = copy.deepcopy(TINY)
+    d["formats"] = {"alpha": {"tier": "OU"}, "beta": {"tier": "UU"}, "gamma": {"tier": "NFE"}, "ditto": {"tier": "PU"},
+                    "deltamega": {"isNonstandard": "Past", "tier": "Illegal"}, "palafinhero": {},
+                    "alphagmax": {"isNonstandard": "Gigantamax", "tier": "Illegal"},
+                    "capreal": {"isNonstandard": "CAP", "tier": "CAP"}}
+    del d["moves"]["pursuit"]["isNonstandard"]
+    return d
