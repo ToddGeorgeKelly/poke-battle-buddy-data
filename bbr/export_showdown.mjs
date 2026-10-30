@@ -1,5 +1,6 @@
-// Exports Pokemon Showdown's current data (a checkout's data/*.ts and data/mods/gen4-8/*.ts) as one JSON file per
-// generation, gen4.json ... gen9.json, for build_bbr.py.
+// Exports Pokemon Showdown's current data (a checkout's data/*.ts and data/mods/gen1-8/*.ts) as one JSON file per
+// generation, gen1.json ... gen9.json, for build_bbr.py. Gens 1-3 are written only when the checkout has their mod
+// folders (a sparse checkout of mods/gen4-8 gives gen4.json ... gen9.json, and build_bbr.py rates those).
 //   node bbr/export_showdown.mjs path/to/pokemon-showdown/data gen
 // Same as the research's load.mjs: Gen 9 is data/ itself; each older gen applies its mod over the next newer gen
 // (entries with `inherit` are merged into the newer entry, others replace it; a mod's formats-data replaces the tiers
@@ -36,7 +37,8 @@ fs.mkdirSync(out, {recursive: true});
 let cur = {};
 for (const [key, [file, name]] of Object.entries(files)) cur[key] = await load(file, name);
 write(9, cur);
-for (let g = 8; g >= 4; g--) {
+for (let g = 8; g >= 1; g--) {
+  if (g < 4 && !fs.existsSync(path.resolve(dir, `mods/gen${g}`))) break;
   const next = {};
   for (const [key, [file, name]] of Object.entries(files)) {
     const mod = await load(`mods/gen${g}/${file}`, name);
@@ -45,4 +47,4 @@ for (let g = 8; g >= 4; g--) {
   cur = next;
   write(g, cur);
 }
-console.error(`wrote ${out}/gen4.json ... gen9.json`);
+console.error(`wrote ${fs.readdirSync(out).filter((f) => /^gen\d\.json$/.test(f)).sort().join(', ')} in ${out}`);

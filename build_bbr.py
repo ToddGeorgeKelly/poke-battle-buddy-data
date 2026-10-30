@@ -1,4 +1,4 @@
-"""Builds bbr.json: every Pokemon's BBR (Battle Buddy Rating), for Poke Battle Buddy, in Generations 4-9.
+"""Builds bbr.json: every Pokemon's BBR (Battle Buddy Rating), for Poke Battle Buddy, in Generations 1-9.
 
 BBR is one number for how good a Pokemon is in singles battles, on BSR's scale (average 420, standard deviation 120).
 It adds up 11 parts, each weighted by how well it predicted Smogon's tiers in Generations 4-9 (fitted on five
@@ -10,19 +10,21 @@ picks them, with that gen's moves, abilities, type chart and battle mechanics. A
 scale come from that field, so a field Pokemon gets the research's own number for that gen. The weights are the same
 in every gen (the research fitted one set on all six). Gen 9 rates every Showdown Pokemon (~1,300): Pokemon in Gen 9
 use Gen 9 moves, the rest moves from every gen. Gens 4-8 rate the Pokemon in that gen's games (its NFEs and other
-untiered Pokemon too). Ditto and Smeargle don't fit the model and are listed under "unrated" instead.
+untiered Pokemon too). Gens 1-3 (not part of the research, same weights) rate too when the export has them, with
+their own mechanics: physical or special by a move's type, no abilities in Gens 1-2, no Stealth Rock before Gen 4.
+Ditto and Smeargle don't fit the model and are listed under "unrated" instead.
 
 bbr.json keeps Gen 9 at the top level (`ratings`, `unrated`), as before the older gens, and adds
-`"gens": {"4": {"ratings": ..., "unrated": ...}, ..., "8": ...}`.
+`"gens": {"1": {"ratings": ..., "unrated": ...}, ..., "8": ...}` ("1"-"3" only when the export has them).
 
     python3 build_bbr.py --data gen --source <showdown commit>   # writes bbr.json if anything changed
     python3 build_bbr.py ... --swift FILE                         # also writes the app's built-in copy
     python3 build_bbr.py --swift-only FILE                        # only the app's copy, from bbr.json
 
-gen/ holds gen4.json ... gen9.json, Pokemon Showdown's current data for each gen (pokedex, formats-data, moves,
+gen/ holds gen1.json ... gen9.json (gen1-gen3 optional), Pokemon Showdown's current data for each gen (pokedex, formats-data, moves,
 abilities, typechart, learnsets, with that gen's mods applied), made by bbr/export_showdown.mjs. Run every day by
 the GitHub Action; it only recomputes when Showdown's data or the model changed (or bbr.json lacks a gen), since the
-battle simulation takes about half an hour for all six gens. Tests: `pytest tests` (add --runslow for the parity
+battle simulation takes about half an hour for every gen. Tests: `pytest tests` (add --runslow for the parity
 check against the research, every gen).
 """
 import json, math, os, sys, time
@@ -36,6 +38,7 @@ from duel import duel_matrix, default_abilities, Side, pair_damage
 MODEL = "2026-10-27"  # change when the weights or the parts change, so every Pokemon is recomputed
 SCHEMA = 1
 OLDER_GENS = (4, 5, 6, 7, 8)  # rated too, each against its own field, under "gens"
+EARLY_GENS = (1, 2, 3)  # also rated when the export has them (it needs Showdown's data/mods/gen1-gen3)
 
 # Weights per standard deviation of each part (BBR Research/common.py SEL, fitted by final_model.py).
 WEIGHTS = {
@@ -142,11 +145,19 @@ def duel_scores(mons, field, g=9):
     return _mean_vs_field(W, mons, field)
 
 
+def stealth_rock_weakness(g, types, eff):
+    """log2 of the share of HP Stealth Rock takes compared with a neutral Pokemon; 0 before Gen 4, which had no
+    Stealth Rock (so the part adds nothing there)."""
+    if g < 4:
+        return 0.0
+    return math.log2(max(np.prod([eff[TI["Rock"], TI[x]] for x in types]), .25))
+
+
 def features(mons, field_mask, duel, g=9):
     """The model's 11 parts for every Pokemon in gen g, with the field as the reference (research: baselines.bsr,
     addfeat, features.utility_features, mech.mech_features)."""
     eff = type_matrix(g)
-    nt = 18 if g >= 6 else 17  # no Fairy type before Gen 6
+    nt = bbrlib.type_count(g)  # no Fairy before Gen 6, no Dark or Steel in Gen 1
     abr = bbrlib.gendata(g)["abilities"]
     mv = bbrlib.gendata(g)["moves"]
     field = [m for m, f in zip(mons, field_mask) if f]
@@ -188,7 +199,7 @@ def features(mons, field_mask, duel, g=9):
         prod = lambda t: np.prod([eff[t, TI[x]] for x in m["types"]])
         f["typ_off"][i] = sum(max(eff[TI[a], TI[d]] for a in m["types"]) for d in TYPES[:nt]) / nt
         f["def_typing"][i] = -sum(share[t] * math.log2(max(prod(t), .25)) for t in range(18))
-        f["sr_weak"][i] = math.log2(max(prod(TI["Rock"]), .25))
+        f["sr_weak"][i] = stealth_rock_weakness(g, m["types"], eff)
         hp, at, de, sa, sd, sp = m["stats"]
         H = 2 * hp + 141
         f["st_minbulk"][i] = min(math.log(H * (2 * de + 36)), math.log(H * (2 * sd + 36)))
@@ -237,17 +248,23 @@ def _table(values):
 
 def make_doc(values, source, built, gens=None):
     """bbr.json's content from Gen 9's {id: BBR} and the older gens' {gen: {id: BBR}}. Gen 9 stays at the top level
-    (`ratings`, `unrated`) so app versions that predate the older gens keep working; Gens 4-8 go under `gens`."""
+    (`ratings`, `unrated`) so app versions that predate the older gens keep working; Gens 1-8 go under `gens`."""
     older = {str(g): {"ratings": _table(v), "unrated": list(UNRATED)} for g, v in sorted((gens or {}).items())}
     return {"schema": SCHEMA, "model": MODEL, "source": source, "built": built, "ratings": _table(values),
             "unrated": list(UNRATED), "gens": older}
 
 
-def up_to_date(old, source):
-    """bbr.json needs no rebuild: same Showdown data, same model, and every older gen in it (a file from before
-    the older gens has no `gens`)."""
+def older_gens(data_path):
+    """The gens rated under "gens": 4-8 always, 1-3 when data_path has their export (gen1.json ...)."""
+    early = tuple(g for g in EARLY_GENS if os.path.exists(os.path.join(data_path, f"gen{g}.json")))
+    return early + OLDER_GENS
+
+
+def up_to_date(old, source, gens=OLDER_GENS):
+    """bbr.json needs no rebuild: same Showdown data, same model, and exactly these older gens in it (a file from
+    before the older gens has no `gens`)."""
     return old.get("source") == source and old.get("model") == MODEL \
-        and set(old.get("gens", {})) == {str(g) for g in OLDER_GENS}
+        and set(old.get("gens", {})) == {str(g) for g in gens}
 
 
 def to_json(doc):
@@ -281,11 +298,12 @@ def main():
     data_path = args[args.index("--data") + 1]
     source = args[args.index("--source") + 1] if "--source" in args else "unknown"
     out = args[args.index("--out") + 1] if "--out" in args else "bbr.json"
-    if os.path.exists(out) and "--force" not in args and up_to_date(json.load(open(out)), source):
+    gens = older_gens(data_path)
+    if os.path.exists(out) and "--force" not in args and up_to_date(json.load(open(out)), source, gens):
         print(f"{out} is already up to date", file=sys.stderr)
         return
     values = {}
-    for g in (9,) + OLDER_GENS:
+    for g in (9,) + gens:
         bbrlib.load_gendata(g, os.path.join(data_path, f"gen{g}.json"))
         started = time.time()
         mons = roster(bbrlib.gendata(g), g)

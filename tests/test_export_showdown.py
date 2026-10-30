@@ -19,6 +19,10 @@ MODS = {
     "gen8/formats-data.ts": "export const FormatsData = {a: {tier: 'UU'}};",
     # Gen 5: Tackle is 50 power; no inherit means the entry is replaced outright.
     "gen5/moves.ts": "export const Moves = {tackle: {num: 33, basePower: 50}};",
+    # Gen 2: Tackle is 35 power. Gen 1 and Gen 3 have a mod folder (README only here) but no change to these tables.
+    "gen3/README.md": "Gen 3",
+    "gen2/moves.ts": "export const Moves = {tackle: {inherit: true, basePower: 35}};",
+    "gen1/README.md": "Gen 1",
 }
 
 
@@ -33,10 +37,26 @@ def showdown(tmp_path):
     out = tmp_path / "gen"
     subprocess.run(["node", os.path.join(ROOT, "bbr", "export_showdown.mjs"), str(data), str(out)], check=True,
                    capture_output=True)
-    return {g: json.load(open(out / f"gen{g}.json")) for g in range(4, 10)}
+    return {g: json.load(open(out / f"gen{g}.json")) for g in range(1, 10) if (out / f"gen{g}.json").exists()}
 
 
-def test_writes_gens_4_to_9_with_every_table(showdown):
+@pytest.fixture
+def showdown_no_early_mods(tmp_path):
+    """A checkout without data/mods/gen1-gen3 (the daily job's sparse checkout before it fetched them)."""
+    if not shutil.which("node"):
+        pytest.skip("needs node")
+    data = tmp_path / "data"
+    for name, text in {**BASE, **{"mods/" + k: v for k, v in MODS.items() if not k.startswith(("gen1", "gen2", "gen3"))}}.items():
+        (data / name).parent.mkdir(parents=True, exist_ok=True)
+        (data / name).write_text(text)
+    out = tmp_path / "gen"
+    subprocess.run(["node", os.path.join(ROOT, "bbr", "export_showdown.mjs"), str(data), str(out)], check=True,
+                   capture_output=True)
+    return sorted(p.name for p in out.iterdir())
+
+
+def test_writes_gens_1_to_9_with_every_table(showdown):
+    assert sorted(showdown) == list(range(1, 10))
     for g, d in showdown.items():
         assert set(d) == {"pokedex", "formats", "moves", "abilities", "typechart", "learnsets"}, g
 
@@ -55,3 +75,10 @@ def test_each_gen_applies_its_mods_over_the_next_gen(showdown):
     assert showdown[6]["moves"]["tackle"]["basePower"] == 40
     assert showdown[5]["moves"]["tackle"] == {"num": 33, "basePower": 50}  # replaced, callback gone
     assert showdown[4]["moves"]["tackle"]["basePower"] == 50
+    assert showdown[3]["moves"]["tackle"]["basePower"] == 50
+    assert showdown[2]["moves"]["tackle"]["basePower"] == 35
+    assert showdown[1]["moves"]["tackle"]["basePower"] == 35
+
+
+def test_gens_1_to_3_are_written_only_when_the_checkout_has_their_mods(showdown_no_early_mods):
+    assert showdown_no_early_mods == [f"gen{g}.json" for g in range(4, 10)]

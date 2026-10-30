@@ -108,3 +108,52 @@ def test_rebuilds_unless_same_source_and_model_and_every_older_gen_is_there():
     assert not build_bbr.up_to_date({k: v for k, v in doc.items() if k != "gens"}, "abc")  # a Gen 9-only bbr.json
     doc["gens"].pop("6")
     assert not build_bbr.up_to_date(doc, "abc")
+
+
+# ---------------------------------------------------------------- Gens 1-3
+def test_gen1_to_3_moves_take_their_category_from_their_type(tiny_old):
+    """No physical/special split before Gen 4: Ghost moves are physical, Dark moves special."""
+    import bbrlib
+    tiny_old["moves"].update(shadowball={"num": 247, "type": "Ghost", "category": "Special", "basePower": 80},
+                             crunch={"num": 242, "type": "Dark", "category": "Physical", "basePower": 80})
+    bbrlib.set_gendata(3, tiny_old)
+    opts = {o["id"]: o for o in bbrlib.move_options(3, dict(moves={"shadowball", "crunch"}), "")}
+    assert (opts["shadowball"]["cat"], opts["shadowball"]["kind"]) == ("Physical", "phys")
+    assert (opts["crunch"]["cat"], opts["crunch"]["kind"]) == ("Special", "spec")
+
+
+def test_gen1_has_15_types_gens_2_to_5_have_17_then_18():
+    import bbrlib
+    assert [bbrlib.type_count(g) for g in (1, 2, 5, 6, 9)] == [15, 17, 17, 18, 18]  # Dark and Steel came in Gen 2
+
+
+def test_stealth_rock_weakness_counts_only_from_gen4():
+    import bbrlib, numpy as np
+    eff = np.ones((18, 18)); eff[bbrlib.TI["Rock"], bbrlib.TI["Fire"]] = 2
+    assert build_bbr.stealth_rock_weakness(4, ["Fire"], eff) == 1
+    assert build_bbr.stealth_rock_weakness(3, ["Fire"], eff) == 0   # Stealth Rock is a Gen 4 move
+
+
+def test_gen1_and_2_pokemon_have_no_abilities_so_none_count(tiny_old):
+    for g in (1, 2):
+        assert all(m["abil"] == [] for m in build_bbr.roster(tiny_old, g=g))
+    assert {m["id"]: m for m in build_bbr.roster(tiny_old, g=3)}["ditto"]["abil"] == ["limber"]  # Gen 3 has them
+
+
+def test_gens_1_to_3_are_rated_when_their_data_was_exported(tmp_path):
+    for g in range(4, 10):
+        (tmp_path / f"gen{g}.json").write_text("{}")
+    assert build_bbr.older_gens(str(tmp_path)) == (4, 5, 6, 7, 8)   # an export without Gens 1-3's mods
+    for g in (1, 2, 3):
+        (tmp_path / f"gen{g}.json").write_text("{}")
+    assert build_bbr.older_gens(str(tmp_path)) == (1, 2, 3, 4, 5, 6, 7, 8)
+
+
+def test_gens_1_to_3_go_under_gens_like_the_others():
+    doc = json.loads(build_bbr.to_json(build_bbr.make_doc({"a": 1}, source="abc", built="2026-10-27T18:04:00Z",
+                                                          gens={g: {"a": 1} for g in range(1, 9)})))
+    assert sorted(doc["gens"]) == ["1", "2", "3", "4", "5", "6", "7", "8"]
+    assert build_bbr.up_to_date(doc, "abc", gens=range(1, 9))
+    assert not build_bbr.up_to_date(doc, "abc", gens=range(4, 9))  # rebuilt when the gens to rate change
+    doc["gens"].pop("1")
+    assert not build_bbr.up_to_date(doc, "abc", gens=range(1, 9))

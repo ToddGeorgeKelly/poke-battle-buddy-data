@@ -10,7 +10,7 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
   Same fields as `meta.json`, same formats and the same 1500 rating cutoff. `build_sets.py` merges each new month over
   the old file, so a Pokémon missing this month keeps its last set. `build_sets.py --backfill 2022-11` rebuilds it from
   every month since then (it was made that way once).
-- `bbr.json` is every Pokémon's BBR (Battle Buddy Rating) in Generations 4–9: one number for how good it is in singles
+- `bbr.json` is every Pokémon's BBR (Battle Buddy Rating) in Generations 1–9: one number for how good it is in singles
   battles, on Smogon BSR's scale (average 420). `build_bbr.py` makes it from Pokémon Showdown's data with a one-on-one battle
   simulation of every pair of Pokémon plus stats, typing, abilities and key moves, weighted by how well each part
   predicted Smogon's tiers in Generations 4–9 (code in `bbr/`, copied from the research:
@@ -21,20 +21,27 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
     Averages, z-scores and the 420/120 scale all come from that field, so a field Pokémon gets the research's own number
     for that gen; the 11 weights are the same in every gen. In Gen 9 every Showdown Pokémon (about 1,300, including
     past-gen forms like Megas) is rated: Pokémon in Gen 9 use their Gen 9 moves, Pokémon not in Gen 9 use moves from
-    every generation (National Dex). Gens 4–8 rate the Pokémon in that gen's games, NFEs and untiered ones included.
+    every generation (National Dex). Gens 1–8 rate the Pokémon in that gen's games, NFEs and untiered ones included.
+  - **Gens 1–3.** The research fitted and checked the model on Gens 4–9 only; Gens 1–3 use the same weights with
+    their own mechanics: a move's type decides whether it's physical or special, Gen 1 has 15 types (one Special stat,
+    which Showdown's data gives as equal Sp. Atk and Sp. Def), Gen 1–2 Pokémon have no abilities (so the ability parts
+    add nothing), and Stealth Rock (Gen 4) counts for nothing. Checked against Smogon's tiers in those gens (rank
+    correlation over each field, model not refitted): Gen 1 0.78, Gen 2 0.85, Gen 3 0.81, against 0.58, 0.80 and 0.81
+    for Gen 4's ratings, which the app used for them before.
   - **Shape.** Gen 9 is at the top level (`ratings`, `unrated`), as it was before the older gens, so older app versions
-    keep working. Gens 4–8 are under `gens`, keyed by the gen as a string, each with its own `ratings` and `unrated`:
+    keep working. Gens 1–8 are under `gens`, keyed by the gen as a string, each with its own `ratings` and `unrated`:
     `{"schema": 1, "model": …, "source": <Showdown commit>, "built": …, "ratings": {…}, "unrated": […],
-    "gens": {"4": {"ratings": {"garchomp": 652, …}, "unrated": ["ditto", "smeargle"]}, …, "8": {…}}}`.
+    "gens": {"1": {"ratings": {"mewtwo": 864, …}, "unrated": ["ditto", "smeargle"]}, …, "8": {…}}}`.
     Keys are Showdown IDs; ratings are whole numbers from 0 to 999. A Pokémon missing from a gen's `ratings` isn't in
     that gen's games (or is unrated).
   - **Forms.** Palafin gets Palafin-Hero's rating and Terapagos gets Terapagos-Terastal's (they always battle in those
     forms), in every gen that has them.
   - **Unrated.** `"unrated": ["ditto", "smeargle"]` lists Pokémon no model of stats and learnsets fits (Imposter, Sketch);
     they're left out of `ratings`. `built` is a UTC timestamp (`2026-10-27T18:04:00Z`), so a same-day rebuild sorts later.
-  - **Data.** `node bbr/export_showdown.mjs ps/data gen` turns a checkout of Showdown's `data/` (with `data/mods/gen4`–`gen8`)
-    into `gen/gen4.json` … `gen9.json`, each gen's mods applied the way the research's `load.mjs` does;
-    `python3 build_bbr.py --data gen --source <commit>` rates all six gens (about half an hour).
+  - **Data.** `node bbr/export_showdown.mjs ps/data gen` turns a checkout of Showdown's `data/` (with `data/mods/gen1`–`gen8`)
+    into `gen/gen1.json` … `gen9.json`, each gen's mods applied the way the research's `load.mjs` does;
+    `python3 build_bbr.py --data gen --source <commit>` rates every gen (about half an hour). Gens 1–3 are only
+    exported, and rated, when the checkout has `data/mods/gen1`–`gen3`; without them bbr.json has Gens 4–9.
   - **Tests.** Set up once with `python3 -m venv .venv && .venv/bin/pip install numpy pytest` (`.venv` is gitignored),
     then `.venv/bin/python -m pytest tests` (fast: field selection per gen, forms, unrated list, file shape,
     the per-gen export, plus meta.json's output and sets.json's merging). `pytest --runslow tests/test_parity.py`

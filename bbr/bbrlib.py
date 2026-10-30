@@ -40,10 +40,15 @@ def load_gendata(g, path):
         set_gendata(g, json.load(fh))
 
 
+def type_count(g):
+    """How many types gen g has: TYPES[:n]. Dark and Steel came in Gen 2, Fairy in Gen 6."""
+    return 18 if g >= 6 else 17 if g >= 2 else 15
+
+
 def type_matrix(g):
     """eff[a, d] = multiplier of attack type a on single defending type d."""
     tc = gendata(g)["typechart"]
-    n = 18 if g >= 6 else 17
+    n = type_count(g)
     eff = np.ones((18, 18))
     for d in TYPES[:n]:
         dt = tc[sid(d)]["damageTaken"]
@@ -185,6 +190,8 @@ FLAG_BOOST = {"strongjaw": ("bite", 1.5), "ironfist": ("punch", 1.2), "sharpness
               "megalauncher": ("pulse", 1.5), "punkrock": ("sound", 1.3)}
 TYPE_BOOST = {"transistor": ("Electric", 1.5), "dragonsmaw": ("Dragon", 1.5), "steelworker": ("Steel", 1.5),
               "rockypayload": ("Rock", 1.5), "waterbubble": ("Water", 2.0), "steelyspirit": ("Steel", 1.5)}
+# Before Gen 4 a move's type decides whether it's physical or special: these types are special, the rest physical.
+SPECIAL_TYPES = {"Fire", "Water", "Grass", "Electric", "Ice", "Psychic", "Dragon", "Dark"}
 ATE = {"aerilate": "Flying", "pixilate": "Fairy", "refrigerate": "Ice", "galvanize": "Electric"}
 
 
@@ -208,8 +215,8 @@ def move_options(g, mon, ability):
         typ, cat = x["type"], x["category"]
         if typ not in TI:
             continue
-        if g <= 3:
-            continue
+        if g <= 3:  # no physical/special split yet: the move's type decides
+            cat = "Special" if typ in SPECIAL_TYPES else "Physical"
         bp = x.get("basePower", 0) or 0
         fixed = None
         if x.get("damage") == "level":

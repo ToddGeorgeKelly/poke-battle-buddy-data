@@ -33,8 +33,8 @@ jobs:
         run: |
           pip install numpy
           git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/smogon/pokemon-showdown.git ps
-          git -C ps sparse-checkout set --no-cone '/data/*.ts' '/data/mods/gen[4-8]/*.ts'
-          node bbr/export_showdown.mjs ps/data gen   # gen/gen4.json ... gen9.json, each gen's mods applied
+          git -C ps sparse-checkout set --no-cone '/data/*.ts' '/data/mods/gen[1-8]/*.ts'
+          node bbr/export_showdown.mjs ps/data gen   # gen/gen1.json ... gen9.json, each gen's mods applied
           python3 build_bbr.py --data gen --source "$(git -C ps log -1 --format=%H)"
       - name: Test before committing
         run: |
