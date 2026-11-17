@@ -48,6 +48,52 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
     (about 20 minutes) checks that production matches the research's ratings in every gen
     (`tests/fixtures/research_gen<g>_ratings.json`, made by `tests/fixtures/research_ref.py`); it needs the research's
     `gen4.json` … `gen9.json` (`BBR_RESEARCH_GEN`, default `/tmp/bbr/gen`).
+- `forms.json` is the form dex (about 56 KB): every species' collectable forms and gender looks, which games have each
+  form, and which can't be had shiny. `python3 build_forms.py` builds it from pinned commits of PokeAPI's CSVs and
+  sprite repo, Pokédex Tracker's seeds and Showdown's formats-data (commits at the top of `build_forms.py`, written to
+  `sources`), Showdown's sprite folders as they are that day, and two hand-written files in `forms/`. It rewrites the
+  file only when something besides `built` changed.
+  - **Shape.** `{"schema": 1, "built": …, "sources": {"pokeapi", "sprites", "pokedextracker", "showdown": <commit>},
+    "gender": {"n": [genderless species], "m": [male only], "f": [female only]}, "species": {<PokeAPI species name>:
+    {"n": 666, "gd": true, "forms": [{…}, …]}}, "shiny": {"never": [keys], "locked": {key: [game ids]}}}`. A species
+    not in `gender` can be either gender. `species` lists only species with two or more forms or a gender difference
+    (Spinda gets none); `gd` means a visible gender difference (PokeAPI's `has_gender_differences`, 102 species). The
+    species' own form is first, then PokeAPI's order.
+  - **A form.** `k` is the catch-log key. A Pokémon's default form goes by its PokeAPI Pokémon name, so the app's
+    existing keys stay valid (`vivillon`, `raichu-alola`, `meowstic-female`); any other form goes by its PokeAPI form
+    name (`vivillon-polar`). `l` is PokeAPI's English form name ("Polar Pattern"). `s` is the Showdown sprite name
+    (`home/`, `ani/`), missing when Showdown has none (then use PokeAPI's). `p` is the PokeAPI sprite name
+    (`666-polar`, `10100`), missing for the species' own form, whose sprite is its dex number. Flags, left out when
+    false:
+    - `f`: a female sprite exists, so the form gets a ♀ mark.
+    - `g`: `"m"` or `"f"`, the form is one gender only (caps, Cosplay Pikachu, and the rows of Meowstic and the other
+      species split by gender).
+    - `ev`: event-only.
+    - `h`: a look-alike or held-item form (Scatterbug and Spewpa patterns, Mothim cloaks, Arceus, Silvally and Genesect
+      types, Xerneas Active…), shown only when the player turns them on.
+    - `r`: already its own row in the app's Pokédex list (regional forms, Rotom, Therians, fusions, caps…). It's still
+      listed so the form bar shows it; it uses the same key, so a mark isn't counted twice.
+  - **Games** use the app's game ids, newest first, plus `home`.
+    - No `c`: the form is wherever its species is.
+    - `c`: the games it can be caught or received in (an empty list means none). The form is then only in `c` and `t`.
+    - `t`: games it can only be transferred or traded into.
+    - `x`: games that have the species but not this form.
+    - `nh`: it can't go to HOME. Every other form can.
+    - Regional forms get `c` from Pokédex Tracker's locations (a "Transfer…" location doesn't count). They get `t` for
+      each HOME game whose Showdown data has the form when Tracker has nowhere to get it there. For example, Alolan
+      Raichu is `"t": ["scarlet-violet"]`.
+  - **Left out:** battle-only forms, Megas, Primals, Gigantamax, Totems, Eternamax, Minior's Meteor shell, Koraidon's and
+    Miraidon's ride modes, and Arceus's ??? type. Pyroar's, Frillish's and Jellicent's female forms are left out too,
+    because their ♀ marks cover them. The lists are at the top of `build_forms.py`.
+  - **Hand-written** (`forms/`, one entry per line):
+    - `form_games.json`: per-game exceptions (`c`, `t`, `x`, `nh`) for cosmetic and event forms.
+    - `shiny_locks.json`: `"never": true` or `"locked": [games]`.
+    - Each entry has `verified` and a `note`, which aren't shipped. They were checked against Serebii, Bulbapedia, PokéPC
+      and news posts, and nothing was copied from them. The build fails on a key that isn't a tracked form or on an
+      unknown game id.
+  - **Tests.** `tests/test_build_forms.py` (fixtures in `tests/fake_forms.py`, no network). `tests/test_published_forms.py`
+    checks the built file: Vivillon has 20 patterns, Unown 28, Alcremie 63, there are no Megas, Gigantamax or Totems, no
+    Spinda, and Alolan Raichu is transfer-only in Scarlet / Violet.
 - `build_meta.py` builds meta.json. A [GitHub Action](.github/workflows/update.yml) runs it (and `build_sets.py`) every day, finds the newest month,
   generation and most-played VGC/Champions formats on its own, and commits only when something changed.
 
@@ -55,5 +101,10 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
 
 - Usage statistics: [Smogon University](https://www.smogon.com/stats/), from battles on [Pokémon Showdown](https://pokemonshowdown.com/).
 - Tiers, Pokémon, move and ability data for BBR: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT license).
+- Forms, genders and sprite names in forms.json: [PokéAPI](https://github.com/PokeAPI/pokeapi) (BSD-3-Clause license),
+  Copyright (c) © 2013–2023 Paul Hallett and PokéAPI contributors; and the [PokéAPI sprites](https://github.com/PokeAPI/sprites) repo (CC0).
+- Regional forms per game in forms.json: [Pokédex Tracker](https://github.com/pokedextracker/pokedextracker.com) seed
+  data (MIT license), Copyright (c) 2016 Pokédex Tracker.
+- Which forms each HOME game accepts, and sprite names, in forms.json: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT license).
 
 Pokémon is © Nintendo, Creatures Inc. and GAME FREAK inc. This project isn't affiliated with them, Smogon or Pokémon Showdown.

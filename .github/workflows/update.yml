@@ -36,16 +36,18 @@ jobs:
           git -C ps sparse-checkout set --no-cone '/data/*.ts' '/data/mods/gen[1-8]/*.ts'
           node bbr/export_showdown.mjs ps/data gen   # gen/gen1.json ... gen9.json, each gen's mods applied
           python3 build_bbr.py --data gen --source "$(git -C ps log -1 --format=%H)"
+      - name: Build forms.json
+        run: python3 build_forms.py   # pinned sources: rewrites the file only when Showdown's sprites or forms/ changed
       - name: Test before committing
         run: |
           pip install pytest
-          python3 -m pytest -q tests   # includes tests/test_published.py: the new bbr.json still has every gen
+          python3 -m pytest -q tests   # includes tests/test_published*.py: the new bbr.json and forms.json hold up
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet meta.json sets.json bbr.json; then
-            git add meta.json sets.json bbr.json
+          if ! git diff --quiet meta.json sets.json bbr.json forms.json; then
+            git add meta.json sets.json bbr.json forms.json
             git commit -m "Usage stats for $(python3 -c 'import json; print(json.load(open("meta.json"))["month"])'), BBR built $(python3 -c 'import json; print(json.load(open("bbr.json"))["built"])')"
             git push
           # GitHub pauses scheduled jobs after 60 days without commits, so leave a small one every 50 days.
