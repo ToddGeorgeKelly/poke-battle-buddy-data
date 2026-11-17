@@ -128,6 +128,40 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
   - **Tests.** `tests/test_build_breeding.py` (fixtures in `tests/fake_breeding.py`, no network).
     `tests/test_published_breeding.py` checks the built file: the 9 incense babies, Manaphy's Eggs, the games without
     breeding, Crystal's tutor rule, and no egg moves for legendaries.
+- `catch.json` is where each Pokémon can be caught in each game, and how each game has it (about 820 KB, 175 KB
+  gzipped). `python3 build_catch.py` builds it from PokeAPI's encounter CSVs (Red / Blue through Black 2 / White 2) and
+  Pokédex Tracker's `seeds/locations.csv` (X / Y through Legends: Z-A, Sword / Shield included), at the same pinned
+  commits as forms.json (written to `sources`); it rewrites the file only when something besides `built` changed.
+  - **Shape.** `{"schema": 1, "built": …, "sources": {"pokeapi", "pokedextracker"}, "pk": [Pokémon names], "loc":
+    [places], "m": [methods], "c": [conditions], "cs": [[indexes into c]], "games": {<game id>: {…}}, "shiny": {}}`.
+    Pokémon are PokeAPI Pokémon names (forms have their own: `raichu-alola`), in PokeAPI's order. The string tables
+    are English and sorted; `cs[0]` is the empty condition set. `shiny` is left for part 2 (hand-written shiny rules
+    and locks). Keys are written sorted, so read the games in the app's own order.
+  - **A game** uses the app's game ids (HOME isn't one). `src`: `pokeapi` or `pokedextracker`. `v`: its versions
+    (`["red", "blue"]`; an expansion pass counts as its version, Mega Dimension as Legends: Z-A). `a`: how the game
+    has each Pokémon, `{status: [indexes into pk]}`, each Pokémon under one status, the best one:
+    - `c` caught or received there (any encounter, gift, in-game trade, raid…), `e` evolved from one the game has,
+      `b` bred from one the game has, `t` traded in from another game, `ev` from an event only, `x` transferred in
+      (from an older game, HOME, GO or the Poké Ball Plus). A Pokémon not listed isn't in the game (or no source
+      says how to get it).
+    - For Pokédex Tracker games these come from Tracker's wording ("Evolve Pikachu", "Breed Pikachu", "Trade from
+      Y", "Event Only", "Transfer required", "Currently unavailable"); a version exclusive is `c`, with its
+      versions on its rows. Gigantamax entries count for the species. For PokeAPI games, they're worked out: `c` for
+      an encounter, then `e` for an evolution (not one from a later generation, nor Magnezone, Probopass, Leafeon or
+      Glaceon in HeartGold / SoulSilver), then `b` for a first stage whose evolution the game has and can breed (not
+      Red / Blue or Yellow). PokeAPI games have no `t`, `ev` or `x`: PokeAPI doesn't say.
+  - **`en`**, the encounters, one row of whole numbers per way to catch a Pokémon, sorted:
+    - PokeAPI games: `[pk, loc, m, chance, min level, max level, cs, versions]`, e.g. Pikachu in Red / Blue's
+      Viridian Forest, walking in tall grass, 5%, Lv 3–5, no conditions, both versions. Slots of the same Pokémon,
+      place, method, conditions and version are merged: their chances add up and the levels span them. Gifts and
+      other methods without a rarity have chance 0. Conditions are PokeAPI's: time of day, season, swarm, radio,
+      Poké Radar, the Game Boy Advance game in slot 2, story progress….
+    - Pokédex Tracker games: `[pk, loc, versions]`. Tracker has no methods, chances or levels; its places carry what
+      it has ("Paniola Town - Fish (SOS only)", "Max Raid Battles: Workout Sea").
+    - `versions` is a bit mask over the game's `v` (1 the first version, 2 the second, 3 both).
+  - **Tests.** `tests/test_build_catch.py` (fixtures in `tests/fake_catch.py`, no network). `tests/test_published_catch.py`
+    checks the built file: every index resolves, Pikachu in Viridian Forest, Hoothoot at night in Diamond / Pearl,
+    Dunsparce's swarm, version exclusives, and some evolve, breed, event and transfer-only Pokémon.
 - `build_meta.py` builds meta.json. A [GitHub Action](.github/workflows/update.yml) runs it (and `build_sets.py`) every day, finds the newest month,
   generation and most-played VGC/Champions formats on its own, and commits only when something changed.
 
@@ -142,6 +176,10 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
 - Species breeding facts and egg moves in breeding.json: [PokéAPI](https://github.com/PokeAPI/pokeapi)
   (BSD-3-Clause license), checked against [Pokémon Showdown](https://github.com/smogon/pokemon-showdown)'s learnsets
   (MIT license).
+- Encounters (Red / Blue through Black 2 / White 2) in catch.json: [PokéAPI](https://github.com/PokeAPI/pokeapi)
+  (BSD-3-Clause license), Copyright (c) © 2013–2023 Paul Hallett and PokéAPI contributors.
+- Locations and availability (X / Y through Legends: Z-A) in catch.json: [Pokédex Tracker](https://github.com/pokedextracker/pokedextracker.com)
+  seed data (MIT license), Copyright (c) 2016 Pokédex Tracker.
 - Which forms each HOME game accepts, and sprite names, in forms.json: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT license).
 
 Pokémon is © Nintendo, Creatures Inc. and GAME FREAK inc. This project isn't affiliated with them, Smogon or Pokémon Showdown.
