@@ -1,0 +1,7 @@
+{
+  "arceus": {"encounter": "Hall of Origin, with the Azure Flute", "lock": "open", "needs": "Legends: Arceus save data", "note": "PKHeX Encounters8b.cs doesn't lock it; the save-data unlock from Serebii / Game8", "verified": "single"},
+  "darkrai": {"encounter": "Newmoon Island, with the Member Card", "lock": "open", "needs": "Legends: Arceus save data", "note": "PKHeX Encounters8b.cs doesn't lock it; the save-data unlock from Serebii / Game8", "verified": "single"},
+  "jirachi": {"encounter": "Gift in Floaroma Town", "lock": "never", "needs": "Sword or Shield save data", "note": "PKHeX Encounters8b.cs Shiny.Never", "verified": "datamine"},
+  "mew": {"encounter": "Gift in Floaroma Town", "lock": "never", "needs": "Let's Go, Pikachu! or Let's Go, Eevee! save data", "note": "PKHeX Encounters8b.cs Shiny.Never", "verified": "datamine"},
+  "shaymin-land": {"encounter": "Flower Paradise, with Oak's Letter", "lock": "open", "needs": "Legends: Arceus save data", "note": "PKHeX Encounters8b.cs doesn't lock it; the save-data unlock from Serebii / Game8", "verified": "single"}
+}

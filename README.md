@@ -47,7 +47,8 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
     the per-gen export, plus meta.json's output and sets.json's merging). `pytest --runslow tests/test_parity.py`
     (about 20 minutes) checks that production matches the research's ratings in every gen
     (`tests/fixtures/research_gen<g>_ratings.json`, made by `tests/fixtures/research_ref.py`); it needs the research's
-    `gen4.json` … `gen9.json` (`BBR_RESEARCH_GEN`, default `/tmp/bbr/gen`).
+    `gen4.json` … `gen9.json` (`BBR_RESEARCH_GEN`, default `/tmp/bbr/gen`). `pytest --runslow
+    tests/test_pkhex_shiny_locks.py` (a few seconds, network) checks catch.json's shiny locks against PKHeX (see catch.json).
 - `forms.json` is the form dex (about 56 KB): every species' collectable forms and gender looks, which games have each
   form, and which can't be had shiny. `python3 build_forms.py` builds it from pinned commits of PokeAPI's CSVs and
   sprite repo, Pokédex Tracker's seeds and Showdown's formats-data (commits at the top of `build_forms.py`, written to
@@ -87,7 +88,8 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
     because their ♀ marks cover them. The lists are at the top of `build_forms.py`.
   - **Hand-written** (`forms/`, one entry per line):
     - `form_games.json`: per-game exceptions (`c`, `t`, `x`, `nh`) for cosmetic and event forms.
-    - `shiny_locks.json`: `"never": true` or `"locked": [games]`.
+    - `shiny_locks.json`: `"never": true` or `"locked": [games]`. The per-encounter source of shiny locks is
+      catch.json's `catch/shiny_locks/`; `tests/test_published_catch.py` keeps the two in step (below).
     - Each entry has `verified` and a `note`, which aren't shipped. They were checked against Serebii, Bulbapedia, PokéPC
       and news posts, and nothing was copied from them. The build fails on a key that isn't a tracked form or on an
       unknown game id.
@@ -128,15 +130,15 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
   - **Tests.** `tests/test_build_breeding.py` (fixtures in `tests/fake_breeding.py`, no network).
     `tests/test_published_breeding.py` checks the built file: the 9 incense babies, Manaphy's Eggs, the games without
     breeding, Crystal's tutor rule, and no egg moves for legendaries.
-- `catch.json` is where each Pokémon can be caught in each game, and how each game has it (about 820 KB, 175 KB
-  gzipped). `python3 build_catch.py` builds it from PokeAPI's encounter CSVs (Red / Blue through Black 2 / White 2) and
+- `catch.json` is where each Pokémon can be caught in each game, how each game has it, and each game's shiny odds,
+  methods and locks (about 880 KB, 185 KB gzipped; the shiny part is about 60 KB of it). `python3 build_catch.py` builds it from PokeAPI's encounter CSVs (Red / Blue through Black 2 / White 2) and
   Pokédex Tracker's `seeds/locations.csv` (X / Y through Legends: Z-A, Sword / Shield included), at the same pinned
-  commits as forms.json (written to `sources`); it rewrites the file only when something besides `built` changed.
+  commits as forms.json (written to `sources`), plus the hand-written shiny files in `catch/`; it rewrites the file
+  only when something besides `built` changed.
   - **Shape.** `{"schema": 1, "built": …, "sources": {"pokeapi", "pokedextracker"}, "pk": [Pokémon names], "loc":
-    [places], "m": [methods], "c": [conditions], "cs": [[indexes into c]], "games": {<game id>: {…}}, "shiny": {}}`.
+    [places], "m": [methods], "c": [conditions], "cs": [[indexes into c]], "games": {<game id>: {…}}, "shiny": {…}}`.
     Pokémon are PokeAPI Pokémon names (forms have their own: `raichu-alola`), in PokeAPI's order. The string tables
-    are English and sorted; `cs[0]` is the empty condition set. `shiny` is left for part 2 (hand-written shiny rules
-    and locks). Keys are written sorted, so read the games in the app's own order.
+    are English and sorted; `cs[0]` is the empty condition set. Keys are written sorted, so read the games in the app's own order.
   - **A game** uses the app's game ids (HOME isn't one). `src`: `pokeapi` or `pokedextracker`. `v`: its versions
     (`["red", "blue"]`; an expansion pass counts as its version, Mega Dimension as Legends: Z-A). `a`: how the game
     has each Pokémon, `{status: [indexes into pk]}`, each Pokémon under one status, the best one:
@@ -159,9 +161,56 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
     - Pokédex Tracker games: `[pk, loc, versions]`. Tracker has no methods, chances or levels; its places carry what
       it has ("Paniola Town - Fish (SOS only)", "Max Raid Battles: Workout Sea").
     - `versions` is a bit mask over the game's `v` (1 the first version, 2 the second, 3 both).
-  - **Tests.** `tests/test_build_catch.py` (fixtures in `tests/fake_catch.py`, no network). `tests/test_published_catch.py`
-    checks the built file: every index resolves, Pikachu in Viridian Forest, Hoothoot at night in Diamond / Pearl,
-    Dunsparce's swarm, version exclusives, and some evolve, breed, event and transfer-only Pokémon.
+  - **`shiny`**, hand-written: `{"games": {<game id>: {…}}, "status": {<key>: {"status", "how"}}}`.
+    - **A game:** `{"shiny": false}` for Red / Blue and Yellow. Otherwise `base` (8192 to Black 2 / White 2, then
+      4096), `charm` (`{"extra": rolls it adds, "how": how to get it}`, absent in games without one), `methods`, `best`
+      (the id of the method to suggest), and, when it has any, `rules` and `locks`.
+    - **A method:** `id`, `name`, `plain` (one line for new players), `detail` (the mechanics), and one kind of odds:
+      `rolls` (total tries, each at 1/base; the chance is 1 − (1 − 1/base)^rolls), `one_in` (a flat 1-in-N chance:
+      the Gen 4 Poké Radar, Dynamax Adventures, Gen 2 breeding…) or `steps` (a chain or level: `{"at": 40 or "when":
+      "Perfect entry", "rolls" or "one_in"}`). `charm_rolls` / `charm_one_in` are the odds with the Shiny Charm; when
+      they're missing the charm doesn't help that method. `approx: true` marks a rounded "about 1 in N" whose formula
+      isn't settled (X / Y Poké Radar, OR / AS DexNav results, US / UM Ultra Wormholes, BDSP's Poké Radar and Grand
+      Underground). `needs` is what unlocks it, when that's another game's save data or an event item.
+    - **Example:** Diamond / Pearl's Masuda Method is `{"id": "masuda", "rolls": 5, …}`: 5 tries at 1/8192, about
+      1 in 1,639.
+    - **`rules`** cover many encounters at once (`{"id": "trades", "plain": "Pokémon from in-game trades are never
+      shiny…"}`; B2W2's Hidden Grottoes, Legends: Arceus's statics).
+    - **`locks`**, by the app's Pokémon / form keys (PokeAPI names, as in pk and forms.json): `{"lock", "encounter"}`
+      plus `needs` when it applies. `never`: every encounter of it in this game is shiny-locked (eggs bred from it
+      aside); `partial`: one is, others can be shiny; `always`: the named encounter is always shiny (the red
+      Gyarados); `open`: can be shiny, listed to say so (BDSP's Arceus needs Legends: Arceus save data; OR / AS's Lati
+      gift).
+    - **`status`**, species-wide, by species name or form key: `never` (never released shiny), `event` (only from an
+      event, GO included), `home-reward` (a Pokémon HOME Pokédex reward, permanent: Keldeo, Meloetta, Volcanion,
+      Meltan), `go` (only from Pokémon GO: the Galarian birds). A Pokémon not listed is normal. `how` says where the
+      shiny comes from. Form-level never-shiny forms (cap Pikachu, Ash-Greninja…) stay in forms.json.
+  - **Hand-written** (`catch/`, one entry or method per line, keys sorted): `shiny_rules/<game id>.json` (one per game),
+    `shiny_locks/<game id>.json` (games with locks; `_rules` holds the rules) and `shiny_status.json`. Each entry, each
+    method and each charm has `verified` (`datamine`: read in a decompilation, PKHeX or a reverse-engineering
+    write-up; `multiple`: two or more sources agree; `single`: one source, or inferred) and a `note` (sources and
+    doubts). A method may also give the 1/N it was written from (`odds`, `charm_odds`) to check its rolls. None of
+    these are shipped. Sources and the settled disputes are in the app repo's `BBR Research/SHINY_RULES_RESEARCH.md`.
+    The odds and locks were checked against pret's decompilations, PKHeX, Serebii and others; nothing was copied from
+    them (PKHeX is GPL), and Bulbapedia text isn't bundled. The build fails on a missing or unknown game, a key that
+    isn't in pk or forms.json (or, for status, a species), rolls that don't match the written 1/N, a `verified` level
+    that isn't one of the three, a missing note, plain or detail line, a `best` that isn't a method, charm odds in a
+    game with no charm, locks in a game with no shinies, or a never-shiny species that's shiny-able somewhere.
+    The Sword / Shield Alola-starter and Alolan-form gifts that PKHeX lists as locked are left out: no in-game source
+    was found.
+  - **Tests.** `tests/test_build_catch.py` and `tests/test_build_catch_shiny.py` (fixtures in `tests/fake_catch.py`
+    and `tests/fake_shiny.py`, no network). `tests/test_published_catch.py` checks the built file: every index and key
+    resolves, Pikachu in Viridian Forest, Hoothoot at night in Diamond / Pearl, Dunsparce's swarm, version exclusives,
+    some evolve, breed, event and transfer-only Pokémon, Gen 4 Masuda at 5 rolls, Z-A's charm at 1 in 1,024, the
+    egg-charm quirk, the red Gyarados, Snacksworth's locked legendaries, BDSP's Arceus, Keldeo's HOME reward. It also
+    keeps forms.json in step: every forms.json lock is a `never` lock here, no never-shiny form is shiny-able here,
+    the never-shiny species match forms.json's never list, and an alternate form locked here is locked in forms.json
+    too, apart from the listed exceptions (eggs can be shiny; or a gap left for a decision).
+  - **PKHeX check** (slow, opt-in): `pytest --runslow tests/test_pkhex_shiny_locks.py` downloads PKHeX's encounter
+    files at a pinned commit into a new temp folder, reads them only as text, and compares, per game and species, its
+    `Shiny.Never` / `Shiny.Always` gifts and statics (trades aside) with our locks. Differences we accept are listed
+    with the reason in the test (`ACCEPTED`); any other fails it with a report. PKHeX files are never shipped or
+    committed.
 - `build_meta.py` builds meta.json. A [GitHub Action](.github/workflows/update.yml) runs it (and `build_sets.py`) every day, finds the newest month,
   generation and most-played VGC/Champions formats on its own, and commits only when something changed.
 

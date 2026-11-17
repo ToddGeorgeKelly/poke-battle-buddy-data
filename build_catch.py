@@ -7,9 +7,12 @@ Sources (pinned to a commit so a rebuild gives the same file):
 - Red / Blue through Black 2 / White 2: PokeAPI's encounter CSVs (BSD-3), https://github.com/PokeAPI/pokeapi
 - X / Y through Legends: Z-A: Pokedex Tracker's seeds/locations.csv (MIT, (c) 2016 Pokedex Tracker),
   https://github.com/pokedextracker/pokedextracker.com/tree/master/seeds
-Part 2 (hand-written shiny rules and locks) will fill in the top-level "shiny" key.
+- Hand-written (part 2, the top-level "shiny" key): catch/shiny_rules/<game>.json (odds and methods),
+  catch/shiny_locks/<game>.json (locked and always-shiny encounters) and catch/shiny_status.json (Pokemon that are
+  never shiny, or shiny only from an event, a HOME reward or GO). Checked against datamines (pret, PKHeX), Serebii and
+  others, but not copied from them; their `verified` levels, notes and odds checks stay out of catch.json.
 """
-import collections, csv, datetime, sys
+import collections, csv, datetime, json, math, os, sys
 import build_forms as bf
 import build_breeding as bb
 
@@ -218,8 +221,9 @@ def tracker_game(names, tracker, game):
 # The file
 
 
-def build(api, tracker, commits, built, games=GAMES):
-    """catch.json as a dict (see the README for the fields)."""
+def build(api, tracker, commits, built, games=GAMES, shiny=None, form_keys=()):
+    """catch.json as a dict (see the README for the fields). shiny: the hand-written {"rules", "locks", "status"}
+    (load_shiny()); their Pokemon must be in pk, in form_keys (forms.json's keys) or, for status, a species name."""
     names = tracker_names(api, tracker)
     raw = {}
     for game in games:
@@ -244,8 +248,185 @@ def build(api, tracker, commits, built, games=GAMES):
             en = [[ipk[p], iloc[place], mask(vs)] for p, place, vs in rows]
         a = {code: sorted(ipk[p] for p, s in statuses.items() if s == code) for code in ORDER}
         out[game] = {"src": src, "v": versions, "a": {k: v for k, v in a.items() if v}, "en": sorted(en)}
+    species = {p["identifier"]: api["species"][p["species_id"]]["identifier"] for p in api["pokemon"].values()}
     return {"schema": SCHEMA, "built": built, "sources": commits, "pk": pk, "loc": loc, "m": m, "c": c,
-            "cs": [list(t) for t in cs], "games": out, "shiny": {}}
+            "cs": [list(t) for t in cs], "games": out,
+            "shiny": shiny_section(shiny, games, set(pk) | set(form_keys), species) if shiny else {}}
+
+
+# Shiny rules, locks and statuses (hand-written)
+
+VERIFIED = ("datamine", "multiple", "single")
+LOCKS = ("never", "always", "partial", "open")      # open: can be shiny, listed for its `needs` or to settle a doubt
+STATUSES = ("never", "event", "home-reward", "go")  # a Pokemon not listed is normal: shiny-able in some game
+SHINY_ABLE = ("always", "partial", "open")
+ODDS_KINDS = ("rolls", "one_in", "steps")
+NOT_SHIPPED = ("verified", "note", "odds", "charm_odds")
+TOLERANCE = 0.001                                   # written 1/N vs the one worked out from rolls: within rounding
+
+
+def odds(base, rolls):
+    """The N of a 1-in-N chance from `rolls` tries at 1/base each."""
+    return 1 / (1 - (1 - 1 / base) ** rolls)
+
+
+def shipped(entry):
+    """An entry without what stays in the hand-written file (verified, note, the written odds that check rolls)."""
+    if isinstance(entry, list):
+        return [shipped(e) for e in entry]
+    if isinstance(entry, dict):
+        return {k: shipped(v) for k, v in entry.items() if k not in NOT_SHIPPED}
+    return entry
+
+
+def check_entry(entry, what, fields=()):
+    """Every hand-written entry has an allowed `verified` level, a `note`, and its own text fields."""
+    if entry.get("verified") not in VERIFIED:
+        raise ValueError(f"{what}: verified must be one of {VERIFIED}, not {entry.get('verified')!r}")
+    if not isinstance(entry.get("note"), str) or not entry["note"].strip():
+        raise ValueError(f"{what}: needs a note (sources, doubts)")
+    for f in fields:
+        if not isinstance(entry.get(f), str) or not entry[f].strip():
+            raise ValueError(f"{what}: needs a {f} line")
+
+
+def check_odds(point, base, charm, what):
+    """One odds point (a method or one of its steps): rolls (total tries) or a fixed 1-in-N chance, with charm
+    variants only in a game with a Shiny Charm, and any written 1/N matching the rolls within rounding."""
+    for field, rolls_field in (("odds", "rolls"), ("charm_odds", "charm_rolls")):
+        if field in point:
+            if rolls_field not in point:
+                raise ValueError(f"{what}: {field} checks {rolls_field}, which is missing")
+            n = odds(base, point[rolls_field])
+            if abs(n - point[field]) > TOLERANCE * n:
+                raise ValueError(f"{what}: {point[rolls_field]} rolls is 1/{n:.1f}, not the written 1/{point[field]}")
+    if not charm and ("charm_rolls" in point or "charm_one_in" in point):
+        raise ValueError(f"{what}: charm odds in a game without a Shiny Charm")
+    if "rolls" in point and not (isinstance(point["rolls"], int) and point["rolls"] >= 1):
+        raise ValueError(f"{what}: rolls must be a whole number from 1")
+    if "one_in" in point and not point["one_in"] > 1:
+        raise ValueError(f"{what}: one_in must be over 1")
+
+
+def check_method(m, base, charm, game):
+    what = f"shiny_rules/{game}.json: {m.get('id')}"
+    check_entry(m, what, ("id", "name", "plain", "detail"))
+    kinds = [k for k in ODDS_KINDS if k in m]
+    if len(kinds) != 1:
+        raise ValueError(f"{what}: needs exactly one of {ODDS_KINDS}, has {kinds}")
+    if "steps" in m:
+        if not m["steps"]:
+            raise ValueError(f"{what}: steps is empty")
+        for i, step in enumerate(m["steps"]):
+            if len([k for k in ("at", "when") if k in step]) != 1 or len([k for k in ODDS_KINDS if k in step]) != 1:
+                raise ValueError(f"{what}: step {i} needs one of at / when and one of rolls / one_in")
+            check_odds(step, base, charm, f"{what} step {i}")
+    else:
+        check_odds(m, base, charm, what)
+
+
+def check_rules(game, r):
+    what = f"shiny_rules/{game}.json"
+    if r.get("shiny") is False:
+        check_entry(r, what)
+        return
+    if r.get("base") not in (8192, 4096):
+        raise ValueError(f"{what}: base must be 8192 or 4096")
+    charm = r.get("charm")
+    if charm:
+        check_entry(charm, f"{what}: charm", ("how",))
+        if not (isinstance(charm.get("extra"), int) and charm["extra"] >= 1):
+            raise ValueError(f"{what}: charm needs its extra rolls")
+    ids = [m.get("id") for m in r.get("methods", [])]
+    if not ids or len(ids) != len(set(ids)):
+        raise ValueError(f"{what}: needs methods with distinct ids")
+    for m in r["methods"]:
+        check_method(m, r["base"], bool(charm), game)
+    if r.get("best") not in ids:
+        raise ValueError(f"{what}: best must name one of its methods, not {r.get('best')!r}")
+
+
+def species_of(key, species):
+    """The species a key belongs to: PokeAPI's for a Pokemon name, else the longest species name it starts with."""
+    if key in species:
+        return species[key]
+    names = sorted({s for s in species.values() if key == s or key.startswith(s + "-")}, key=len)
+    return names[-1] if names else key
+
+
+def check_shiny(shiny, games, known, species):
+    rules, locks, status = shiny["rules"], shiny["locks"], shiny["status"]
+    for name, files in (("shiny_rules", rules), ("shiny_locks", locks)):
+        unknown = sorted(set(files) - set(games))
+        if unknown:
+            raise ValueError(f"{name}: unknown game ids {unknown}")
+    missing = [g for g in games if g not in rules]
+    if missing:
+        raise ValueError(f"shiny_rules: no file for {missing}")
+    for game in games:
+        check_rules(game, rules[game])
+    for game, entries in locks.items():
+        what = f"shiny_locks/{game}.json"
+        if rules[game].get("shiny") is False and entries:
+            raise ValueError(f"{what}: {game} has no shiny Pokemon, so no locks")
+        for i, rule in enumerate(entries.get("_rules", [])):
+            check_entry(rule, f"{what}: rule {i}", ("id", "plain"))
+        for key, e in entries.items():
+            if key == "_rules":
+                continue
+            if key not in known:
+                raise ValueError(f"{what}: {key} isn't in catch.json's pk or forms.json")
+            check_entry(e, f"{what}: {key}", ("encounter",))
+            if e.get("lock") not in LOCKS:
+                raise ValueError(f"{what}: {key} lock must be one of {LOCKS}, not {e.get('lock')!r}")
+    all_species = set(species.values())
+    for key, e in status.items():
+        if key not in known and key not in all_species:
+            raise ValueError(f"shiny_status.json: {key} isn't a species, nor in catch.json's pk or forms.json")
+        check_entry(e, f"shiny_status.json: {key}", ("how",))
+        if e.get("status") not in STATUSES:
+            raise ValueError(f"shiny_status.json: {key} status must be one of {STATUSES}, not {e.get('status')!r}")
+    never = {k for k, e in status.items() if e["status"] == "never"}
+    for game, entries in locks.items():
+        for key, e in entries.items():
+            if key != "_rules" and e["lock"] in SHINY_ABLE and (key in never or species_of(key, species) in never):
+                raise ValueError(f"shiny_locks/{game}.json: {key} is never shiny (shiny_status.json) but "
+                                 f"{e['lock']} here")
+
+
+def shiny_section(shiny, games, known, species):
+    """catch.json's "shiny": per game its rules with its locks folded in, and the species-wide statuses."""
+    check_shiny(shiny, games, known, species)
+    out = {}
+    for game in games:
+        g = shipped(shiny["rules"][game])
+        entries = shiny["locks"].get(game, {})
+        if entries.get("_rules"):
+            g["rules"] = shipped(entries["_rules"])
+        locked = {k: shipped(e) for k, e in sorted(entries.items()) if k != "_rules"}
+        if locked:
+            g["locks"] = locked
+        out[game] = g
+    return {"games": out, "status": {k: shipped(e) for k, e in sorted(shiny["status"].items())}}
+
+
+def form_keys(path=None):
+    """The keys forms.json knows (every form-dex form, and its never-shiny and locked keys)."""
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "forms.json")
+    with open(path) as f:
+        doc = json.load(f)
+    return ({f["k"] for sp in doc["species"].values() for f in sp["forms"]} | set(doc["shiny"]["never"]) |
+            set(doc["shiny"]["locked"]))
+
+
+def load_shiny(root=None):
+    """The hand-written shiny files under catch/: {"rules": {game: ...}, "locks": {game: ...}, "status": {...}}."""
+    root = root or os.path.join(os.path.dirname(os.path.abspath(__file__)), "catch")
+    per_game = lambda d: {f[:-5]: json.load(open(os.path.join(root, d, f))) for f in sorted(os.listdir(
+        os.path.join(root, d))) if f.endswith(".json")}
+    with open(os.path.join(root, "shiny_status.json")) as f:
+        status = json.load(f)
+    return {"rules": per_game("shiny_rules"), "locks": per_game("shiny_locks"), "status": status}
 
 
 def availability(doc, game):
@@ -289,7 +470,8 @@ def main(argv):
     tracker = parse_tracker({n: bf.raw("pokedextracker/pokedextracker.com", TRACKER, f"seeds/{n}.csv")
                              for n in ("pokemon", "locations")})
     doc = build(api, tracker, commits={"pokeapi": POKEAPI, "pokedextracker": TRACKER},
-                built=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+                built=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                shiny=load_shiny(), form_keys=form_keys())
     empty = [g for g, v in doc["games"].items() if not v["en"]]
     if empty:
         raise SystemExit(f"no encounters for {empty}")

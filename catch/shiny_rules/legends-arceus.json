@@ -1,0 +1,11 @@
+{
+  "base": 4096,
+  "best": "mass-outbreak",
+  "charm": {"extra": 3, "how": "Bring every Pokédex entry to research level 10 (Mythicals not needed), then talk to Professor Laventon.", "verified": "multiple", "note": "Serebii; RotomLabs"},
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any wild Pokémon starts at 1 in 4,096; research on its Pokédex entry raises that.", "detail": "1 try. With the Shiny Charm every entry is already at research level 10, so the charm figure includes that try: 5 in all. Alphas and space-time distortion Pokémon use these odds.", "rolls": 1, "charm_rolls": 5, "charm_odds": 819.6, "verified": "multiple", "note": "RotomLabs; Pokémon GO Hub; alphas and distortions [single]"},
+    {"id": "research", "name": "Pokédex research", "plain": "Research a Pokémon fully: level 10 adds a shiny try, a perfect entry adds two more.", "detail": "Research level 10: +1 try. Perfect entry: +2 more. The Shiny Charm adds 3.", "steps": [{"when": "Research level 10", "rolls": 2, "charm_rolls": 5}, {"when": "Perfect entry", "rolls": 4, "charm_rolls": 7, "odds": 1024.4, "charm_odds": 585.6}], "verified": "multiple", "note": "RotomLabs; Pokémon GO Hub"},
+    {"id": "mass-outbreak", "name": "Mass outbreak", "plain": "Hunt in a mass outbreak: with a perfect Pokédex entry and the Shiny Charm, about 1 in 128 is shiny.", "detail": "+25 tries in a mass outbreak, on top of research and the Shiny Charm (version 1.1.0 and later).", "steps": [{"when": "No research bonus", "rolls": 26}, {"when": "Perfect entry", "rolls": 29, "charm_rolls": 32, "charm_odds": 128.5}], "verified": "multiple", "note": "RotomLabs; Pokémon GO Hub"},
+    {"id": "massive-mass-outbreak", "name": "Massive mass outbreak", "plain": "Massive mass outbreaks (version 1.1.0 and later) help too, a bit less: about 1 in 216 with everything.", "detail": "+12 tries, on top of research and the Shiny Charm.", "steps": [{"when": "No research bonus", "rolls": 13}, {"when": "Perfect entry", "rolls": 16, "charm_rolls": 19, "charm_odds": 216.1}], "verified": "multiple", "note": "RotomLabs; Pokémon GO Hub"}
+  ]
+}

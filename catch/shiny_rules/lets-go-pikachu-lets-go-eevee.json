@@ -1,0 +1,12 @@
+{
+  "base": 4096,
+  "best": "catch-combo-lure",
+  "charm": {"extra": 2, "how": "Catch all 150 original Pokémon (No. 001–150), then talk to the Game Freak director in Celadon City.", "verified": "multiple", "note": "Pokémon.com Let's Go post-game guide; Serebii"},
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 4,096 chance to be shiny.", "detail": "One try per Pokémon, 3 with the Shiny Charm. Legendaries, Snorlax and other static Pokémon count here: the Shiny Charm helps them, a catch combo doesn't.", "rolls": 1, "odds": 4096, "charm_rolls": 3, "charm_odds": 1365.7, "verified": "multiple", "note": "Base odds; statics take the charm but not the combo (Serebii, RotomLabs)"},
+    {"id": "lure", "name": "Lure", "plain": "Use a Lure: one extra shiny try for every wild Pokémon while it lasts.", "detail": "+1 try. Stacks with the catch combo and the Shiny Charm.", "rolls": 2, "charm_rolls": 4, "odds": 2048.3, "charm_odds": 1024.4, "verified": "multiple", "note": "Serebii; RotomLabs"},
+    {"id": "catch-combo", "name": "Catch combo", "plain": "Catch the same Pokémon again and again without running away: after 31 in a row, about 1 in 342 is shiny (1 in 293 with the Shiny Charm).", "detail": "Combo 0–10: 1 try, 11–20: 4, 21–30: 8, 31+: 12; the Shiny Charm adds 2.", "steps": [{"at": 11, "rolls": 4, "charm_rolls": 6, "odds": 1024.4, "charm_odds": 683.1}, {"at": 21, "rolls": 8, "charm_rolls": 10, "odds": 512.4, "charm_odds": 409.9}, {"at": 31, "rolls": 12, "charm_rolls": 14, "odds": 341.6, "charm_odds": 293}], "verified": "multiple", "note": "Serebii; RotomLabs"},
+    {"id": "catch-combo-lure", "name": "Catch combo with a Lure", "plain": "A catch combo with a Lure on and the Shiny Charm is the best way: about 1 in 273 from 31 in a row.", "detail": "The combo's tries plus 1 for the Lure, plus 2 for the Shiny Charm.", "steps": [{"at": 0, "rolls": 2, "charm_rolls": 4}, {"at": 11, "rolls": 5, "charm_rolls": 7}, {"at": 21, "rolls": 9, "charm_rolls": 11}, {"at": 31, "rolls": 13, "charm_rolls": 15, "odds": 315.5, "charm_odds": 273.5}], "verified": "multiple", "note": "Serebii; RotomLabs"},
+    {"id": "gifts-trades", "name": "Gifts and in-game trades", "plain": "Gifts and in-game trades can be shiny at the base 1 in 4,096; the Shiny Charm doesn't help.", "detail": "1 try, no Shiny Charm.", "rolls": 1, "verified": "single", "note": "RotomLabs"}
+  ]
+}

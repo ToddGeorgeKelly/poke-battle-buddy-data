@@ -1,0 +1,14 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters5B2W2.cs: 31 trades (7 regular, 24 Yancy / Curtis) with a fixed PID", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"},
+    {"id": "hidden-grotto", "note": "PKHeX EncounterSlot5.cs: IsHiddenGrotto ? Shiny.Never", "plain": "Pokémon in Hidden Grottoes are never shiny.", "verified": "datamine"},
+    {"id": "n-pokemon", "note": "Inferred from their fixed PID (15 statics, N's Zorua included)", "plain": "N's Pokémon, found around Unova with N's name as their trainer, are never shiny.", "verified": "single"}
+  ],
+  "deerling": {"encounter": "The Route 6 gift (Hidden Ability) is never shiny; wild Deerling can be", "lock": "partial", "note": "PKHeX Encounters5B2W2.cs Shiny.Never", "verified": "datamine"},
+  "dratini": {"encounter": "Benga's gift in Floccesy Town (White 2)", "lock": "always", "note": "PKHeX Encounters5B2W2.cs Shiny.Always", "verified": "datamine"},
+  "eevee": {"encounter": "Gift in Castelia City (Hidden Ability)", "lock": "never", "note": "PKHeX Encounters5B2W2.cs Shiny.Never", "verified": "datamine"},
+  "gible": {"encounter": "Benga's gift in Floccesy Town (Black 2)", "lock": "always", "note": "PKHeX Encounters5B2W2.cs Shiny.Always", "verified": "datamine"},
+  "haxorus": {"encounter": "The Nature Preserve Haxorus", "lock": "always", "note": "PKHeX Encounters5B2W2.cs Shiny.Always; Serebii", "verified": "datamine"},
+  "reshiram": {"encounter": "Dragonspiral Tower (White 2)", "lock": "never", "note": "PKHeX Encounters5B2W2.cs Shiny.Never", "verified": "datamine"},
+  "zekrom": {"encounter": "Dragonspiral Tower (Black 2)", "lock": "never", "note": "PKHeX Encounters5B2W2.cs Shiny.Never", "verified": "datamine"}
+}

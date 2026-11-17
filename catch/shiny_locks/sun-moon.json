@@ -1,0 +1,24 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters7SM.cs: 7 trades with a fixed PID", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"}
+  ],
+  "buzzwole": {"encounter": "Ultra Beast, Looker's missions and the ones met after (Sun)", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never for the mission static; the later wild ones are believed locked too in Sun / Moon (not datamined here)", "verified": "single"},
+  "celesteela": {"encounter": "Ultra Beast, Looker's missions and the ones met after (Moon)", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never for the mission static; the later wild ones are believed locked too in Sun / Moon (not datamined here)", "verified": "single"},
+  "cosmog": {"encounter": "Gift at the Lake of the Sunne / Moone", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "guzzlord": {"encounter": "Ultra Beast, Looker's missions and the ones met after", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never for the mission static; the later wild ones are believed locked too in Sun / Moon (not datamined here)", "verified": "single"},
+  "kartana": {"encounter": "Ultra Beast, Looker's missions and the ones met after (Sun)", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never for the mission static; the later wild ones are believed locked too in Sun / Moon (not datamined here)", "verified": "single"},
+  "lunala": {"encounter": "Altar of the Moone (Moon)", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "magearna": {"encounter": "QR Scanner gift", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "necrozma": {"encounter": "Ten Carat Hill, after the story", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "nihilego": {"encounter": "Ultra Beast, Looker's missions and the ones met after", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never for the mission static; the later wild ones are believed locked too in Sun / Moon (not datamined here)", "verified": "single"},
+  "pheromosa": {"encounter": "Ultra Beast, Looker's missions and the ones met after (Moon)", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never for the mission static; the later wild ones are believed locked too in Sun / Moon (not datamined here)", "verified": "single"},
+  "solgaleo": {"encounter": "Altar of the Sunne (Sun)", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "tapu-bulu": {"encounter": "Its ruin, after the story", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "tapu-fini": {"encounter": "Its ruin, after the story", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "tapu-koko": {"encounter": "Its ruin, after the story", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "tapu-lele": {"encounter": "Its ruin, after the story", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "wishiwashi-solo": {"encounter": "The Brooklet Hill Wishiwashi is never shiny; fished ones can be", "lock": "partial", "note": "PKHeX Encounters7SM.cs Shiny.Never", "verified": "datamine"},
+  "xurkitree": {"encounter": "Ultra Beast, Looker's missions and the ones met after", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never for the mission static; the later wild ones are believed locked too in Sun / Moon (not datamined here)", "verified": "single"},
+  "zygarde-10": {"encounter": "Built in the Zygarde Cube from Cells and Cores", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never (all forms)", "verified": "datamine"},
+  "zygarde-50": {"encounter": "Built in the Zygarde Cube from Cells and Cores", "lock": "never", "note": "PKHeX Encounters7SM.cs Shiny.Never (all forms)", "verified": "datamine"}
+}

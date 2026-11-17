@@ -169,7 +169,7 @@ def test_the_file_shape(doc):
     assert set(doc) == {"schema", "built", "sources", "pk", "loc", "m", "c", "cs", "games", "shiny"}
     assert doc["schema"] == 1 and doc["sources"] == {"pokeapi": "abc", "pokedextracker": "def"}
     assert list(doc["games"]) == fake.GAMES
-    assert doc["shiny"] == {}  # filled in by part 2 (shiny rules and locks)
+    assert doc["shiny"] == {}  # no hand-written shiny files given (tests/test_build_catch_shiny.py has them)
     assert doc["cs"][0] == []
 
 

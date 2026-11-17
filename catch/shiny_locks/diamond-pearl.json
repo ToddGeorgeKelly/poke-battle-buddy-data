@@ -1,0 +1,5 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters4DPPt.cs: Abra, Chatot, Haunter, Magikarp have a fixed PID", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"}
+  ]
+}

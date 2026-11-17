@@ -1,0 +1,10 @@
+{
+  "base": 8192,
+  "best": "masuda",
+  "charm": {"extra": 2, "how": "Catch every Pokémon in the National Pokédex (Mythicals not needed), then talk to Professor Juniper in Nuvema Town.", "verified": "multiple", "note": "DittoBase; Serebii"},
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 8,192 chance to be shiny.", "detail": "One try at the base odds per Pokémon, 3 with the Shiny Charm.", "rolls": 1, "odds": 8192, "charm_rolls": 3, "charm_odds": 2731, "verified": "multiple", "note": "Base odds"},
+    {"id": "masuda", "name": "Masuda Method", "plain": "Breed two Pokémon whose games are in different languages: the eggs have a much better shiny chance.", "detail": "6 tries per egg, 8 with the Shiny Charm.", "rolls": 6, "odds": 1365.8, "charm_rolls": 8, "charm_odds": 1024.4, "verified": "multiple", "note": "Serebii; Bulbapedia (excerpt)"},
+    {"id": "eggs", "name": "Breeding (same-language parents)", "plain": "Ordinary eggs have the normal shiny chance; the Shiny Charm helps them too.", "detail": "1 try, 3 with the Shiny Charm.", "rolls": 1, "charm_rolls": 3, "charm_odds": 2731, "verified": "single", "note": "Bulbapedia (excerpt): earlier games count the first try too, so 3 with the charm; not datamined for Gen 5"}
+  ]
+}

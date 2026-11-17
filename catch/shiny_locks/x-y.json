@@ -1,0 +1,14 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters6XY.cs: 9 trades with a fixed PID", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"}
+  ],
+  "articuno": {"encounter": "Roams, then waits in the Sea Spirit's Den (one bird, by starter)", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "lucario": {"encounter": "Korrina's gift at the Tower of Mastery", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "mewtwo": {"encounter": "Unknown Dungeon", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "moltres": {"encounter": "Roams, then waits in the Sea Spirit's Den (one bird, by starter)", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "snorlax": {"encounter": "Route 7, asleep on the bridge", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "xerneas": {"encounter": "Team Flare Secret HQ (X)", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "yveltal": {"encounter": "Team Flare Secret HQ (Y)", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "zapdos": {"encounter": "Roams, then waits in the Sea Spirit's Den (one bird, by starter)", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"},
+  "zygarde-50": {"encounter": "Terminus Cave", "lock": "never", "note": "PKHeX Encounters6XY.cs Shiny.Never", "verified": "datamine"}
+}

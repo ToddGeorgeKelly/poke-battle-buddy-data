@@ -1,0 +1,6 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters2.cs: trades have fixed DVs that aren't shiny values", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"}
+  ],
+  "gyarados": {"encounter": "The red Gyarados at the Lake of Rage", "lock": "always", "note": "pokecrystal maps/LakeOfRage.asm BATTLETYPE_FORCESHINY", "verified": "datamine"}
+}

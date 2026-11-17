@@ -1,0 +1,11 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters5BW.cs: 7 trades (Emolga, Rotom, Munchlax, Petilil / Cottonee, Basculin) with a fixed PID", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"},
+    {"id": "entralink", "note": "PKHeX EncounterStatic5Entree hard-codes it", "plain": "Pokémon from the Entralink (Entree Forest) and the Dream World are never shiny.", "verified": "datamine"}
+  ],
+  "reshiram": {"encounter": "N's Castle, or Dragonspiral Tower if you don't catch it there (Black)", "lock": "never", "note": "PKHeX Encounters5BW.cs Shiny.Never", "verified": "datamine"},
+  "victini": {"encounter": "Liberty Garden", "lock": "never", "needs": "The Liberty Pass (event)", "note": "PKHeX Encounters5BW.cs Shiny.Never; needs the Liberty Pass event item (Serebii)", "verified": "datamine"},
+  "zekrom": {"encounter": "N's Castle, or Dragonspiral Tower if you don't catch it there (White)", "lock": "never", "note": "PKHeX Encounters5BW.cs Shiny.Never", "verified": "datamine"},
+  "zoroark": {"encounter": "Lostlorn Forest", "lock": "never", "needs": "An event Entei, Raikou or Suicune", "note": "PKHeX Encounters5BW.cs Shiny.Never; needs one of the 2011 movie Entei, Raikou or Suicune (Serebii)", "verified": "datamine"},
+  "zorua": {"encounter": "Gift in Castelia City", "lock": "never", "needs": "An event Celebi", "note": "PKHeX Encounters5BW.cs Shiny.Never; needs the 2011 movie Celebi (Serebii)", "verified": "datamine"}
+}

@@ -1,0 +1,7 @@
+{
+  "base": 8192,
+  "best": "wild",
+  "methods": [
+    {"id": "wild", "name": "Any Pokémon", "plain": "Nothing raises the shiny chance in this game: every Pokémon is 1 in 8,192.", "detail": "Shiny when trainer ID xor secret ID xor the two halves of the personality value is under 8. No Shiny Charm, Masuda Method or chaining; breeding gives no boost.", "rolls": 1, "odds": 8192, "verified": "datamine", "note": "pokeemerald include/constants/pokemon.h SHINY_ODDS 8"}
+  ]
+}

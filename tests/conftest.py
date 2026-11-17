@@ -15,7 +15,7 @@ def pytest_addoption(parser):
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "slow: runs the battle simulation on a full field")
+    config.addinivalue_line("markers", "slow: opt-in with --runslow (battle simulation parity, the PKHeX shiny-lock check)")
 
 
 def pytest_collection_modifyitems(config, items):

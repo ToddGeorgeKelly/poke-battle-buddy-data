@@ -1,0 +1,10 @@
+{
+  "base": 4096,
+  "best": "hyperspace",
+  "charm": {"extra": 3, "how": "Finish all of Mable's research.", "verified": "single", "note": "RotomLabs"},
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 4,096 chance to be shiny.", "detail": "One try per Pokémon, alphas too; 4 with the Shiny Charm. A Pokémon's shininess is set when it appears, so leaving and coming back re-rolls it.", "rolls": 1, "odds": 4096, "charm_rolls": 4, "charm_odds": 1024.4, "verified": "datamine", "note": "PKHeX Templates/Gen9a EncounterSlot9a.cs ShinyCharm = 3; Kaphotics: '+3 shiny rolls instead of +2'; respawn re-roll is community practice [single]"},
+    {"id": "hyperspace", "name": "Hyperspace with Sparkling Power", "plain": "In Hyperspace (Mega Dimension), eat a Sparkling Power donut: Pokémon of its type get better shiny odds, and at level 3 the first one of that type that appears near you is shiny.", "detail": "Level 1/2/3: +1/+2/+3 tries, only in Hyperspace; the Shiny Charm stacks (level 3 + charm = 7 tries). The forced shiny is the first matching Pokémon on entering a Hyperspace wild zone.", "steps": [{"when": "Level 1", "rolls": 2, "charm_rolls": 5}, {"when": "Level 2", "rolls": 3, "charm_rolls": 6}, {"when": "Level 3", "rolls": 4, "charm_rolls": 7, "odds": 1024.4, "charm_odds": 585.6}], "verified": "datamine", "note": "PKHeX EncounterSlot9a.cs ShinyHyperspace = 3 (it models only the rolls); the forced spawn from Anubis / RotomLabs [multiple]"},
+    {"id": "fossils", "name": "Fossil revivals", "plain": "Revived fossils (Aerodactyl, Tyrunt, Amaura) are 1 in 4,096; the Shiny Charm doesn't help.", "detail": "1 try, no Shiny Charm.", "rolls": 1, "verified": "datamine", "note": "PKHeX Encounters9a.cs fossils Shiny = Random; EncounterStatic9a ignores the charm for them"}
+  ]
+}

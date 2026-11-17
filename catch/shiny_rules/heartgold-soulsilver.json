@@ -1,0 +1,8 @@
+{
+  "base": 8192,
+  "best": "masuda",
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 8,192 chance to be shiny.", "detail": "One try at the base odds per Pokémon.", "rolls": 1, "odds": 8192, "verified": "datamine", "note": "pokeplatinum / pokeemerald-style check, 1/8,192"},
+    {"id": "masuda", "name": "Masuda Method", "plain": "Breed two Pokémon whose games are in different languages: the eggs have a much better shiny chance.", "detail": "If the egg isn't shiny, the game re-rolls its personality value up to 4 more times: 5 tries in all, about 1 in 1,639. Sites that say 1 in 2,048 count only the re-rolls.", "rolls": 5, "odds": 1638.8, "verified": "datamine", "note": "pokeplatinum src/overlay005/daycare.c and pokeheartgold src/get_egg.c: 1 PID + up to 4 re-rolls = 5 checks. The re-rolls come from a seeded chain, so 5/8192 is the standard approximation; Serebii's 1/2,048 counts only the re-rolls."}
+  ]
+}

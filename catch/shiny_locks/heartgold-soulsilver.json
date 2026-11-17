@@ -1,0 +1,9 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters4HGSS.cs: 10 trades with a fixed PID", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"}
+  ],
+  "gyarados": {"encounter": "The red Gyarados at the Lake of Rage", "lock": "always", "note": "PKHeX Encounters4HGSS.cs Shiny.Always", "verified": "datamine"},
+  "pichu-spiky-eared": {"encounter": "Ilex Forest shrine", "lock": "never", "needs": "An event Pichu in your party", "note": "PKHeX Encounters4HGSS.cs Shiny.Never", "verified": "datamine"},
+  "shuckle": {"encounter": "Shuckie, the gift in Cianwood City, is never shiny; wild Shuckle can be", "lock": "partial", "note": "PKHeX Encounters4HGSS.cs: the gift has a fixed PID", "verified": "datamine"},
+  "spearow": {"encounter": "Kenya, the Spearow gift for the Route 31 delivery, is never shiny; wild Spearow can be", "lock": "partial", "note": "PKHeX Encounters4HGSS.cs: the gift has a fixed PID", "verified": "datamine"}
+}

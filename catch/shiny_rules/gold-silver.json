@@ -1,0 +1,8 @@
+{
+  "base": 8192,
+  "best": "shiny-parent",
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 8,192 chance to be shiny.", "detail": "Shininess comes from the DVs: Defense, Speed and Special 10, Attack 2, 3, 6, 7, 10, 11, 14 or 15. A shiny always has those DVs.", "rolls": 1, "odds": 8192, "verified": "datamine", "note": "pokecrystal engine/gfx/color.asm CheckShininess: Defense, Speed, Special DV 10 and Attack 2/3/6/7/10/11/14/15 = 1/8,192"},
+    {"id": "shiny-parent", "name": "Breed with a shiny parent", "plain": "Breed a shiny Pokémon with Ditto or a partner of the other gender: about 1 in 64 eggs hatch shiny.", "detail": "The egg copies the Defense DV and part of the Special DV from the Ditto, or else from the parent of the egg's opposite gender, so a shiny parent of the egg's own gender doesn't help. Uneven gender ratios shift the rate a little.", "one_in": 64, "verified": "datamine", "note": "pokecrystal engine/events/daycare.asm: 1/2 x 1/2 x 1/16 = 1/64; the gender-ratio effect is ignored [single]"}
+  ]
+}

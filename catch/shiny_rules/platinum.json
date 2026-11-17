@@ -1,0 +1,9 @@
+{
+  "base": 8192,
+  "best": "poke-radar",
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 8,192 chance to be shiny.", "detail": "One try at the base odds per Pokémon.", "rolls": 1, "odds": 8192, "verified": "datamine", "note": "pokeplatinum / pokeemerald-style check, 1/8,192"},
+    {"id": "masuda", "name": "Masuda Method", "plain": "Breed two Pokémon whose games are in different languages: the eggs have a much better shiny chance.", "detail": "If the egg isn't shiny, the game re-rolls its personality value up to 4 more times: 5 tries in all, about 1 in 1,639. Sites that say 1 in 2,048 count only the re-rolls.", "rolls": 5, "odds": 1638.8, "verified": "datamine", "note": "pokeplatinum src/overlay005/daycare.c and pokeheartgold src/get_egg.c: 1 PID + up to 4 re-rolls = 5 checks. The re-rolls come from a seeded chain, so 5/8192 is the standard approximation; Serebii's 1/2,048 counts only the re-rolls."},
+    {"id": "poke-radar", "name": "Poké Radar chain", "plain": "Use the Poké Radar and keep catching or defeating the same Pokémon: from a chain of 40, each shaking patch has a 1 in 200 chance to sparkle, and a sparkling patch is always shiny.", "detail": "Chance per patch is 1 in (8,200 − 200 × chain), down to 1 in 200 from chain 40. Other patches use the normal odds. The counter stops at 999.", "steps": [{"at": 0, "one_in": 8200}, {"at": 10, "one_in": 6200}, {"at": 20, "one_in": 4200}, {"at": 30, "one_in": 2200}, {"at": 35, "one_in": 1200}, {"at": 39, "one_in": 400}, {"at": 40, "one_in": 200}], "verified": "datamine", "note": "pokeplatinum src/pokeradar.c CheckPatchShiny"}
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "base": 4096,
+  "best": "sos",
+  "charm": {"extra": 2, "how": "Catch all 300 Pokémon in the Alola Pokédex (Magearna and Marshadow not needed), then talk to the Game Freak director at the hotel in Heahea City.", "verified": "multiple", "note": "Thonky; Serebii"},
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 4,096 chance to be shiny.", "detail": "One try at the base odds per Pokémon, 3 with the Shiny Charm.", "rolls": 1, "odds": 4096, "charm_rolls": 3, "charm_odds": 1365.7, "verified": "multiple", "note": "Base odds"},
+    {"id": "masuda", "name": "Masuda Method", "plain": "Breed two Pokémon whose games are in different languages: the eggs have a much better shiny chance.", "detail": "6 tries per egg, 8 with the Shiny Charm.", "rolls": 6, "odds": 683.1, "charm_rolls": 8, "charm_odds": 512.4, "verified": "multiple", "note": "Serebii; PokeStats"},
+    {"id": "eggs", "name": "Breeding (same-language parents)", "plain": "Ordinary eggs have the normal shiny chance; the Shiny Charm helps them too.", "detail": "1 try, 3 with the Shiny Charm.", "rolls": 1, "charm_rolls": 3, "charm_odds": 1365.7, "verified": "multiple", "note": "Serebii; Bulbapedia (excerpt)"},
+    {"id": "sos", "name": "SOS chaining", "plain": "Keep a wild Pokémon calling for help: after 30 calls in a row, each new ally is about 1 in 315 to be shiny (1 in 273 with the Shiny Charm).", "detail": "+4 tries from a chain of 11, +8 from 21, +12 from 31. In Sun and Moon the counter goes back to 0 after 255.", "steps": [{"at": 11, "rolls": 5, "charm_rolls": 7, "odds": 819.6, "charm_odds": 585.6}, {"at": 21, "rolls": 9, "charm_rolls": 11, "odds": 455.6, "charm_odds": 372.8}, {"at": 31, "rolls": 13, "charm_rolls": 15, "odds": 315.5, "charm_odds": 273.5}], "verified": "multiple", "note": "Serebii; PokeStats; RotomLabs"}
+  ]
+}

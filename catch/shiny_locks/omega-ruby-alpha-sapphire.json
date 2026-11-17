@@ -1,0 +1,17 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters6AO.cs: Makuhita, Skitty, Corsola with a fixed PID", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"}
+  ],
+  "deoxys-normal": {"encounter": "Sky Pillar, after the Delta Episode", "lock": "never", "note": "PKHeX Encounters6AO.cs Shiny.Never", "verified": "datamine"},
+  "groudon": {"encounter": "Cave of Origin (Omega Ruby)", "lock": "never", "note": "PKHeX Encounters6AO.cs Shiny.Never", "verified": "datamine"},
+  "kyogre": {"encounter": "Cave of Origin (Alpha Sapphire)", "lock": "never", "note": "PKHeX Encounters6AO.cs Shiny.Never", "verified": "datamine"},
+  "latias": {"encounter": "Gift with the Eon Flute after the story", "lock": "open", "note": "Some fan sites say it's locked; PKHeX Encounters6AO.cs doesn't lock it", "verified": "datamine"},
+  "latios": {"encounter": "Gift with the Eon Flute after the story", "lock": "open", "note": "Some fan sites say it's locked; PKHeX Encounters6AO.cs doesn't lock it", "verified": "datamine"},
+  "pikachu-belle": {"encounter": "Cosplay Pikachu, the Contest Spectacular gift", "lock": "never", "note": "PKHeX Encounters6AO.cs: the Cosplay Pikachu template is Shiny.Never", "verified": "datamine"},
+  "pikachu-cosplay": {"encounter": "Cosplay Pikachu, the Contest Spectacular gift", "lock": "never", "note": "PKHeX Encounters6AO.cs: the Cosplay Pikachu template is Shiny.Never", "verified": "datamine"},
+  "pikachu-libre": {"encounter": "Cosplay Pikachu, the Contest Spectacular gift", "lock": "never", "note": "PKHeX Encounters6AO.cs: the Cosplay Pikachu template is Shiny.Never", "verified": "datamine"},
+  "pikachu-phd": {"encounter": "Cosplay Pikachu, the Contest Spectacular gift", "lock": "never", "note": "PKHeX Encounters6AO.cs: the Cosplay Pikachu template is Shiny.Never", "verified": "datamine"},
+  "pikachu-pop-star": {"encounter": "Cosplay Pikachu, the Contest Spectacular gift", "lock": "never", "note": "PKHeX Encounters6AO.cs: the Cosplay Pikachu template is Shiny.Never", "verified": "datamine"},
+  "pikachu-rock-star": {"encounter": "Cosplay Pikachu, the Contest Spectacular gift", "lock": "never", "note": "PKHeX Encounters6AO.cs: the Cosplay Pikachu template is Shiny.Never", "verified": "datamine"},
+  "rayquaza": {"encounter": "Sky Pillar", "lock": "never", "note": "PKHeX Encounters6AO.cs Shiny.Never", "verified": "datamine"}
+}

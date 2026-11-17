@@ -1,0 +1,5 @@
+{
+  "_rules": [
+    {"id": "trades", "note": "PKHeX Encounters3RSE.cs: fixed PID and trainer IDs", "plain": "Pokémon from in-game trades are never shiny: their values are fixed.", "verified": "datamine"}
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "base": 8192,
+  "best": "masuda",
+  "methods": [
+    {"id": "wild", "name": "Random encounters", "plain": "Any Pokémon you meet has a 1 in 8,192 chance to be shiny.", "detail": "One try at the base odds per Pokémon.", "rolls": 1, "odds": 8192, "verified": "multiple", "note": "Base odds, no Shiny Charm in Black / White"},
+    {"id": "masuda", "name": "Masuda Method", "plain": "Breed two Pokémon whose games are in different languages: the eggs have a much better shiny chance.", "detail": "6 tries per egg.", "rolls": 6, "odds": 1365.8, "verified": "multiple", "note": "Serebii; Bulbapedia (excerpt)"}
+  ]
+}

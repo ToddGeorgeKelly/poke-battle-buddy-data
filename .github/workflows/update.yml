@@ -41,7 +41,7 @@ jobs:
       - name: Build breeding.json
         run: python3 build_breeding.py   # pinned sources: rewrites the file only when a pinned commit was bumped
       - name: Build catch.json
-        run: python3 build_catch.py   # pinned sources: rewrites the file only when a pinned commit was bumped
+        run: python3 build_catch.py   # pinned sources: rewrites the file only when a pinned commit was bumped or catch/ changed
       - name: Test before committing
         run: |
           pip install pytest
