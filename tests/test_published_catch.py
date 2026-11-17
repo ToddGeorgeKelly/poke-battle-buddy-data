@@ -181,12 +181,6 @@ def test_every_shiny_entry_resolves_and_ships_no_notes(doc, forms):
 NOT_IN_FORMS = {
     ("scarlet-violet", "growlithe-hisui"): "eggs can be shiny, so the form isn't locked in the game",
     ("scarlet-violet", "meowth-galar"): "eggs can be shiny, so the form isn't locked in the game",
-    **{("sword-shield", k): "gap: ask the user before adding to forms/shiny_locks.json"
-       for k in ("articuno-galar", "zapdos-galar", "moltres-galar")},
-    **{("legends-arceus", k): "gap: ask the user before adding to forms/shiny_locks.json"
-       for k in ("vulpix-alola", "giratina-origin", "tornadus-therian", "thundurus-therian", "landorus-therian")},
-    **{(g, "zygarde-10"): "gap: ask the user before adding to forms/shiny_locks.json"
-       for g in ("sun-moon", "ultra-sun-ultra-moon")},
 }
 
 
