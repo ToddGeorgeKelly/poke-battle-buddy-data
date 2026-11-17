@@ -38,16 +38,18 @@ jobs:
           python3 build_bbr.py --data gen --source "$(git -C ps log -1 --format=%H)"
       - name: Build forms.json
         run: python3 build_forms.py   # pinned sources: rewrites the file only when Showdown's sprites or forms/ changed
+      - name: Build breeding.json
+        run: python3 build_breeding.py   # pinned sources: rewrites the file only when a pinned commit was bumped
       - name: Test before committing
         run: |
           pip install pytest
-          python3 -m pytest -q tests   # includes tests/test_published*.py: the new bbr.json and forms.json hold up
+          python3 -m pytest -q tests   # includes tests/test_published*.py: the new bbr.json, forms.json and breeding.json hold up
       - name: Commit if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet meta.json sets.json bbr.json forms.json; then
-            git add meta.json sets.json bbr.json forms.json
+          if ! git diff --quiet meta.json sets.json bbr.json forms.json breeding.json; then
+            git add meta.json sets.json bbr.json forms.json breeding.json
             git commit -m "Usage stats for $(python3 -c 'import json; print(json.load(open("meta.json"))["month"])'), BBR built $(python3 -c 'import json; print(json.load(open("bbr.json"))["built"])')"
             git push
           # GitHub pauses scheduled jobs after 60 days without commits, so leave a small one every 50 days.

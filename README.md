@@ -94,6 +94,40 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
   - **Tests.** `tests/test_build_forms.py` (fixtures in `tests/fake_forms.py`, no network). `tests/test_published_forms.py`
     checks the built file: Vivillon has 20 patterns, Unown 28, Alcremie 63, there are no Megas, Gigantamax or Totems, no
     Spinda, and Alolan Raichu is transfer-only in Scarlet / Violet.
+- `breeding.json` is the breeding section's data (about 1 MB, 260 KB gzipped): every species' egg groups, gender
+  ratio, hatch cycles and baby facts, and for each game with breeding, every egg move with who learns it and how. The
+  app works out egg move partners itself from that. `python3 build_breeding.py` builds it from PokeAPI's CSVs and
+  Showdown's learnsets at the commits at the top of the script (written to `sources`); it rewrites the file only when
+  something besides `built` changed.
+  - **Shape.** `{"schema": 1, "built": …, "sources": {"pokeapi", "showdown": <commit>}, "species": {<PokeAPI species
+    name>: {…}}, "games": {<game id>: {…}}, "pk": [Pokémon names]}`.
+  - **A species.** `eg`: egg groups (PokeAPI's names: `monster`, `water1`, `ground` is Field, `humanshape`, `ditto`,
+    `no-eggs` is Undiscovered…). `g`: gender rate in eighths female, −1 genderless. `h`: hatch cycles. Left out when
+    they don't apply:
+    - `b`: a baby. `i`: the incense a parent must hold for its Egg to hatch into this baby (the 9 incense babies).
+      `bp`: for a baby, the evolutions to breed to get it.
+    - `o`: the species its Eggs hatch into, when not itself (Raichu's hatch Pichu; Manaphy's Phione). Without the
+      incense, an incense line's Eggs hatch into the stage after the baby (Snorlax's hatch Snorlax).
+    - `ao`: species its Eggs can also hatch into (Nidoran ♀: Nidoran ♂; Illumise: Volbeat).
+  - **A game** uses the app's game ids (HOME isn't one). `gen`; `br`: whether it has breeding (not Red / Blue, Yellow,
+    Let's Go, Legends: Arceus or Z-A). A breeding game also has:
+    - `em`: every egg move there, `{move: {method: [indexes into pk]}}`. Methods: `e` egg move, `l` level-up, `m` TM,
+      `t` tutor. Moves are PokeAPI names; Pokémon are PokeAPI Pokémon names (forms have their own learnsets). A game
+      includes its DLC (Sword / Shield's Isle of Armor and Crown Tundra, Scarlet / Violet's Teal Mask and Indigo
+      Disk). Light Ball's Volt Tackle isn't listed, and nor are PokeAPI's "egg moves" for Pokémon that can't hatch
+      (legendaries such as Entei).
+    - `r`: hints for the app's partner rules. `father`: only the father passes egg moves; `tm`: he passes TM moves
+      too (Gens 2–5); `tutor`: and tutor moves (Crystal); `mirror-herb`: any Pokémon that knows the move can pass it
+      at a picnic with a Mirror Herb (Scarlet / Violet). Gen 6+ games have no `r`: either parent passes egg moves.
+  - **The Showdown check.** Scarlet / Violet's and BDSP's egg moves are checked against Showdown's (`9E`, and the
+    `gen8bdsp` mod); the build fails on a disagreement. Showdown lists egg moves on first stages only, so evolved
+    Pokémon are compared only where Showdown has them, and a form Showdown files under its species is compared with
+    the species. The 19 real disagreements (Zangoose, Cramorant, Plusle, Minun, Fomantis, Noibat, Rockruff) are in
+    `ALLOWED` in `build_breeding.py`; breeding.json keeps PokeAPI's. An allowance that no longer disagrees fails the
+    build too, so the list stays current when a commit is bumped.
+  - **Tests.** `tests/test_build_breeding.py` (fixtures in `tests/fake_breeding.py`, no network).
+    `tests/test_published_breeding.py` checks the built file: the 9 incense babies, Manaphy's Eggs, the games without
+    breeding, Crystal's tutor rule, and no egg moves for legendaries.
 - `build_meta.py` builds meta.json. A [GitHub Action](.github/workflows/update.yml) runs it (and `build_sets.py`) every day, finds the newest month,
   generation and most-played VGC/Champions formats on its own, and commits only when something changed.
 
@@ -105,6 +139,9 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
   Copyright (c) © 2013–2023 Paul Hallett and PokéAPI contributors; and the [PokéAPI sprites](https://github.com/PokeAPI/sprites) repo (CC0).
 - Regional forms per game in forms.json: [Pokédex Tracker](https://github.com/pokedextracker/pokedextracker.com) seed
   data (MIT license), Copyright (c) 2016 Pokédex Tracker.
+- Species breeding facts and egg moves in breeding.json: [PokéAPI](https://github.com/PokeAPI/pokeapi)
+  (BSD-3-Clause license), checked against [Pokémon Showdown](https://github.com/smogon/pokemon-showdown)'s learnsets
+  (MIT license).
 - Which forms each HOME game accepts, and sprite names, in forms.json: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT license).
 
 Pokémon is © Nintendo, Creatures Inc. and GAME FREAK inc. This project isn't affiliated with them, Smogon or Pokémon Showdown.
