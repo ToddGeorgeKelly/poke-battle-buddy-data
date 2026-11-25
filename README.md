@@ -211,6 +211,39 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
     `Shiny.Never` / `Shiny.Always` gifts and statics (trades aside) with our locks. Differences we accept are listed
     with the reason in the test (`ACCEPTED`); any other fails it with a report. PKHeX files are never shipped or
     committed.
+- `places.json` is each region's places for the app's own schematic map at the top of WHERE TO FIND (about 13 KB):
+  towns, routes, caves, buildings and areas, which connects to which, a rough grid spot for each, and which catch.json
+  place names belong to which place, so the app can light every place a Pokémon is found. Only Kanto's mainland so
+  far (Red / Blue, Yellow, FireRed / LeafGreen, Let's Go); FR / LG's Sevii Islands get their own map later.
+  `python3 build_places.py` checks the hand-written `places/<region>.json` and publishes it; it rewrites the file only
+  when something besides `built` changed. Items, NPCs and trainers per place may join it later.
+  - **Shape.** `{"schema": 1, "built": …, "regions": {"kanto": {"name": "Kanto", "grid": [22, 21], "games": [game
+    ids], "places": {<id>: {…}}, "links": [[a, b, <route id or null>]], "alias": {<catch.json place name>: <id>}}}}`.
+  - **A place.** `n` its English name, `k` its kind (`town`, `route`, `sea` for a sea route, `cave`, `building`,
+    `area` for a forest or the Safari Zone), `url` its Bulbapedia page (the app links to it). A top-level place has
+    `at`, `[column, row]` on the region's `grid` (0-based, west to east and north to south; no two share a spot); a
+    building inside a town has `in`, the town's id, and no `at` (draw it as a tag on its town). Routes are places
+    too: their `at` is where the route's number pill sits, and it doubles as the bend where a route turns.
+  - **Links** are the lines to draw, each once, in either direction: `["pallet-town", "route-1", "route-1"]`. The
+    third value is the route the line is part of (light it with that route), or `null` for a way through that isn't
+    a route (a cave mouth, the Underground Paths, Diglett's Cave, Victory Road to the Plateau, the Power Plant's
+    water). Every top-level place can be reached from Pallet Town.
+  - **Aliases** map every catch.json place name of the region's games to a place: floors and areas fold into their
+    place (`Mount Moon (B1F)` and `Mt. Moon` → `mt-moon`; `Road 2 (north, towards Pewter City)` → `route-2`), and
+    gifts and trades go to the most specific place there is (`Saffron City Fighting Dojo Gift` → `fighting-dojo`,
+    `Cerulean City Trade` → `cerulean-city`). A name not in `alias` isn't on this map.
+  - **Hand-written** (`places/kanto.json`, one place or link per line). Facts only: places, connections and spots come
+    from written route descriptions and the app's own mockup, never traced from a map image or taken from a game's
+    data (or a decompilation's map grid); no map is bundled or linked. `skip` (not shipped) lists the catch.json
+    names that belong to no place on this map, each with why: the Sevii Islands, "Roaming Kanto", PokeAPI's
+    "1091". An entry also covers its floors (`Lost Cave` covers `Lost Cave (room 1)`). The build fails on an unknown
+    id in a place, link or alias, a link labelled with a place that isn't a route, a doubled link, two places on one
+    spot, a spot off the grid, a place that can't be reached, a URL that isn't a Bulbapedia wiki page, or a name both
+    aliased and skipped.
+  - **Tests.** `tests/test_build_places.py` (the checks, on a tiny region). `tests/test_published_places.py` checks the
+    built file matches a fresh build, Routes 1–25 are there (19–21 at sea), every place name in catch.json's four
+    Kanto games maps to a place or is skipped, every alias and skip entry is a real catch.json name (so the list
+    can't go stale), no alias is a Sevii name, and the tricky names map where they should.
 - `build_meta.py` builds meta.json. A [GitHub Action](.github/workflows/update.yml) runs it (and `build_sets.py`) every day, finds the newest month,
   generation and most-played VGC/Champions formats on its own, and commits only when something changed.
 
@@ -230,5 +263,7 @@ competitive format, with their common moves, items, abilities, Tera types, EV sp
 - Locations and availability (X / Y through Legends: Z-A) in catch.json: [Pokédex Tracker](https://github.com/pokedextracker/pokedextracker.com)
   seed data (MIT license), Copyright (c) 2016 Pokédex Tracker.
 - Which forms each HOME game accepts, and sprite names, in forms.json: [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) (MIT license).
+- Places in places.json: our own table, written from route descriptions; each place links to its page on
+  [Bulbapedia](https://bulbapedia.bulbagarden.net/) (nothing from it is bundled).
 
 Pokémon is © Nintendo, Creatures Inc. and GAME FREAK inc. This project isn't affiliated with them, Smogon or Pokémon Showdown.
